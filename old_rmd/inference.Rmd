@@ -1,0 +1,376 @@
+---
+title: "inference"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+n <-  2500
+
+
+
+# hard_additive
+theta = function(W1,W2,W3) {W1^2 + (W2 + W3 - W1)/2}
+D <- DAG.empty()
+theta <- Vectorize(theta)
+
+key <- "hard_additive"
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "runif", min = -1, max = 1) +
+  node("W3", distr = "runif", min = -1, max = 1) +
+  node("g", distr = "rconst", const = 0.15 + 0.75*plogis(cos((W1+W2 + W3)*5) * sin((W1+W2 + W3)*5) + cos((W1+W2 + W3)*5) + sin((W1+W2 + W3)*5) + sin(W1*5) + W1*sin(W1*5) + cos(W2*5) + 2*W1*W2 - sin(W3*5) + sin(5*W1*W3) + 2*W1*W2*W3 + W3*sin(W1*5) + cos(W2*4)*sin(W1*5) ) ) +
+  node("A", distr = "rbinom", size = 1, prob = g )+
+  node("phi", distr = "rconst", const = (1+W1 + W2)*sin(W1*5)  + (1+W2 + W3)*cos(5*W2) + 0.5*exp(W1*W2) + cos(6*W1*W3)+ sin(6*W3*W2) + sin(6*W1*W2) + W3*sin(5*W3) + W2*sin(5*W3)) +
+  node("theta", distr = "rconst", const =  theta(W1,W2,W3))+
+  node("gRtilde0", distr = "rconst",  const = (-(exp(theta) + 1)*exp(phi) + (exp(2*phi)*(exp(theta) + 1)^2 + 4*(exp(theta + phi))*(1 - exp(phi)))^(0.5))/(2*exp(theta)*(1-exp(phi)))
+  ) +
+  node("gRtilde1", distr = "rconst",  const =    gRtilde0*exp(theta)) +
+  node("gRtilde", distr = "rconst",  const =   A*gRtilde1 + (1-A)*gRtilde0) +
+  node("gR", distr = "rconst",  const =  gRtilde ) +
+  node("R", distr = "rbinom", size = 1, prob = gR)+
+  node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
+
+setD <- set.DAG(D, vecfun = c("bound", "round", "theta"))
+data <- sim(setD, n = n)
+
+Y <- data$R
+A <- data$A
+V <- as.matrix(data[, c("W1")])
+X <- as.matrix(data[, c("W1", "W2", "W3")])
+
+
+```
+
+```{r}
+
+ inference <- npRR_inference(out)
+df <- as.data.frame(inference$estimates)
+df
+ggplot(df, aes(x = V, y = (RR))) + geom_line() + geom_ribbon(aes(ymin= (lower_CI), ymax= (upper_CI)), alpha=0.2) + xlab("Value of V") + ylab("Relative Risk")  
+
+
+ggplot(df, aes(x = V, y = (RR))) + geom_line() + geom_ribbon(aes(ymin= (lower_CI), ymax= (upper_CI)), alpha=0.2) + xlab("Value of V") + ylab("Relative Risk")  + geom_line(data = data.frame(V = V, RR = (out$RR)),  aes(x = V, y = (RR)), color = "blue")
+
+ggplot(df, aes(x = V, y = (RR))) + geom_line() + geom_ribbon(aes(ymin= (lower_CI), ymax= (upper_CI)), alpha=0.2) + xlab("Value of V") + ylab("Relative Risk")  + geom_line(data = data.frame(V = V, RR = inference$RR_targeted),  aes(x = V, y = (RR)), color = "red") 
+```
+
+
+```{r, include = F}
+data <- sim(setD, n = 7500)
+
+Y <- data$R
+A <- data$A
+V <- as.matrix(data[, c("W1")])
+X <- as.matrix(data[, c("W1", "W2", "W3")])
+
+
+out <- npRR(V,X,A,Y, basis_list = make_fourier_basis_list(V),
+            library_V =   make_pkg_SL_learner("SL.xgboost" , max_depth = 6, family = binomial(), outcome_type = variable_type("binomial")),
+            , cv_RR = F,   library_RR = list(SL_learner_to_LRR_learner("SL.xgboost",  max_depth = 4)))
+```
+
+ 
+
+
+```{r}
+library(ggplot2)
+kernel_function <- function(x,y, sigma) {
+  l <- min(x)
+  u <- max(x)
+   
+  if(min(y -  2.25*sigma - l, u - (y+  2.25*sigma)) < 0) {
+    sigma <- min(min(y-l, u - y)/2.25 )
+  }
+   v <- exp(-(y-x)^2/(2*sigma^2)) /  sqrt(2*3.14*sigma^2)
+}
+inference <- npRR_inference(out, npoints = 50, min_samples = 150 )
+df <- as.data.frame(inference$estimates)
+df
+ggplot(df, aes(x = V, y = (RR))) + geom_line() + geom_ribbon(aes(ymin= (lower_CI), ymax= (upper_CI)), alpha=0.2) + xlab("Value of V") + ylab("Relative Risk")  
+
+
+ggplot(df, aes(x = V, y =  (RR))) + geom_line() + geom_ribbon(aes(ymin=  (lower_CI), ymax=  (upper_CI)), alpha=0.2) + xlab("Value of V") + ylab("Relative Risk")  + geom_line(data = data.frame(V = data_full$W1, RR = RR_true),  aes(x = V, y =  (RR)), color = "blue")  + geom_line(data = data.frame(V = V, RR = out$RR),  aes(x = V, y =  (RR)), color = "red")
+
+ggplot(df, aes(x = V, y =  log(RR))) + geom_line() + geom_ribbon(aes(ymin=  log(lower_CI), ymax=  log(upper_CI)), alpha=0.2) + xlab("Value of V") + ylab("Relative Risk")  + geom_line(data = data.frame(V = data_full$W1, RR = RR_true),  aes(x = V, y =  log(RR)), color = "blue")  + geom_line(data = data.frame(V = V, RR = out$RR),  aes(x = V, y =  log(RR)), color = "red")
+```
+
+
+```{r}
+
+
+
+```
+
+
+```{r}
+passes <- c()
+for(i in 1:100) {
+n <-  500
+# hard_additive
+theta = function(W1,W2,W3) {( 1.2*W1^2 + 1/(3+ W1) + 0.1*W1)}
+D <- DAG.empty()
+theta <- Vectorize(theta)
+
+key <- "hard_additive"
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "runif", min = -1, max = 1) +
+  node("W3", distr = "runif", min = -1, max = 1) +
+  node("g", distr = "rconst", const = 0.15 + 0.75*plogis(cos((W1+W2 + W3)*5) * sin((W1+W2 + W3)*5) + cos((W1+W2 + W3)*5) + sin((W1+W2 + W3)*5) + sin(W1*5) + W1*sin(W1*5) + cos(W2*5) + 2*W1*W2 - sin(W3*5) + sin(5*W1*W3) + 2*W1*W2*W3 + W3*sin(W1*5) + cos(W2*4)*sin(W1*5) ) ) +
+  node("A", distr = "rbinom", size = 1, prob = g )+
+  node("phi", distr = "rconst", const = (1+W1 + W2)*sin(W1*5)  + (1+W2 + W3)*cos(5*W2) + 0.5*exp(W1*W2) + cos(6*W1*W3)+ sin(6*W3*W2) + sin(6*W1*W2) + W3*sin(5*W3) + W2*sin(5*W3)) +
+  node("theta", distr = "rconst", const =  theta(W1,W2,W3))+
+  node("gRtilde0", distr = "rconst",  const = (-(exp(theta) + 1)*exp(phi) + (exp(2*phi)*(exp(theta) + 1)^2 + 4*(exp(theta + phi))*(1 - exp(phi)))^(0.5))/(2*exp(theta)*(1-exp(phi)))
+  ) +
+  node("gRtilde1", distr = "rconst",  const =    gRtilde0*exp(theta)) +
+  node("gRtilde", distr = "rconst",  const =   A*gRtilde1 + (1-A)*gRtilde0) +
+  node("gR", distr = "rconst",  const =  gRtilde ) +
+  node("R", distr = "rbinom", size = 1, prob = gR)+
+  node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
+
+setD <- set.DAG(D, vecfun = c("bound", "round", "theta"))
+data <- sim(setD, n = n)
+
+Y <- data$R
+A <- data$A
+V <- as.matrix(data[, c("W1")])
+X <- as.matrix(data[, c("W1", "W2", "W3")])
+
+
+
+out <- npRR(V,X,A,Y, library_V =   make_learner(Lrnr_pkg_SuperLearner,"SL.gam" , deg.gam = 3, family = binomial(), outcome_type = variable_type("binomial")),
+            , cv_RR = F, library_A = Lrnr_xgboost$new(max_depth = 5), library_Y = Lrnr_xgboost$new(max_depth = 5), library_RR = list(
+              "gam_4" = SL_learner_to_LRR_learner("SL.gam", deg.gam = 4)))
+
+inference <- npRR_inference(out)
+kern_fun <- function(x){exp(-(-0.75-x)^2/(2*0.001^2)) /  sqrt(2*3.14*0.001^2)}
+
+lower <- inference$estimates[,3]
+upper <- inference$estimates[,4]
+print(inference$estimates)
+print(true)
+passes <- c(passes, true <= upper && true >= lower)
+print(table(passes))
+print(mean(passes))
+}
+```
+
+ 
+
+
+```{r}
+
+data_full <- sim(setD, n = 100000)
+tsk1 <- sl3_Task$new(data_full, covariates = "W1", outcome = "gRtilde1")
+lrnr  <-  Pipeline$new(Lrnr_cv$new(Stack$new(
+  Lrnr_xgboost$new(max_depth = 6),   Lrnr_xgboost$new(max_depth = 5),   Lrnr_xgboost$new(max_depth = 7),  Lrnr_xgboost$new(max_depth = 4), Lrnr_gam$new()
+)), Lrnr_cv_selector$new(loss_loglik_binomial))
+
+lrnr1 <- lrnr$train(tsk1)
+tsk1 <- sl3_Task$new(data, covariates = "W1", outcome = "gRtilde1")
+
+tsk0 <- sl3_Task$new(data_full, covariates = "W1", outcome = "gRtilde0")
+lrnr0 <- Lrnr_xgboost$new(max_depth = 5)
+lrnr0 <- lrnr$train(tsk0)
+
+tsk <- tsk0
+tska <- sl3_Task$new(data, covariates = "W1", outcome = "gRtilde0")
+
+RR_true <- lrnr1$predict(tsk0)/lrnr0$predict(tsk0)
+true <- exp(mean(kern_fun(data_full$W1) * log(RR_true)) / mean(kern_fun(data_full$W1)))
+```
+
+
+
+
+```{r, include = F}
+
+output_list <- list()
+passed <-c()
+for(i in 1:200) {
+  n <- 7500
+  
+  
+  
+  # hard_additive
+  theta = function(W1,W2,W3) {W1^2 + (W2 + W3 - W1)/2}
+  D <- DAG.empty()
+  theta <- Vectorize(theta)
+  
+  key <- "hard_additive"
+  D <- D +
+    node("W1", distr = "runif", min = -1, max = 1) +
+    node("W2", distr = "runif", min = -1, max = 1) +
+    node("W3", distr = "runif", min = -1, max = 1) +
+    node("g", distr = "rconst", const = 0.15 + 0.75*plogis(cos((W1+W2 + W3)*5) * sin((W1+W2 + W3)*5) + cos((W1+W2 + W3)*5) + sin((W1+W2 + W3)*5) + sin(W1*5) + W1*sin(W1*5) + cos(W2*5) + 2*W1*W2 - sin(W3*5) + sin(5*W1*W3) + 2*W1*W2*W3 + W3*sin(W1*5) + cos(W2*4)*sin(W1*5) ) ) +
+    node("A", distr = "rbinom", size = 1, prob = g )+
+    node("phi", distr = "rconst", const = (1+W1 + W2)*sin(W1*5)  + (1+W2 + W3)*cos(5*W2) + 0.5*exp(W1*W2) + cos(6*W1*W3)+ sin(6*W3*W2) + sin(6*W1*W2) + W3*sin(5*W3) + W2*sin(5*W3)) +
+    node("theta", distr = "rconst", const =  theta(W1,W2,W3))+
+    node("gRtilde0", distr = "rconst",  const = (-(exp(theta) + 1)*exp(phi) + (exp(2*phi)*(exp(theta) + 1)^2 + 4*(exp(theta + phi))*(1 - exp(phi)))^(0.5))/(2*exp(theta)*(1-exp(phi)))
+    ) +
+    node("gRtilde1", distr = "rconst",  const =    gRtilde0*exp(theta)) +
+    node("gRtilde", distr = "rconst",  const =   A*gRtilde1 + (1-A)*gRtilde0) +
+    node("gR", distr = "rconst",  const =  gRtilde ) +
+    node("R", distr = "rbinom", size = 1, prob = gR)+
+    node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
+  
+  setD <- set.DAG(D, vecfun = c("bound", "round", "theta"))
+  data <- sim(setD, n = n)
+  print(data)
+  ##################
+  ###################   WORKS
+  #A <- rbinom(n, size = 1, prob = 0.2+ 0.6*plogis(sin(5*(V %*% c(1,1,1))) + 0.5*cos(5*(V %*% c(1,1,1)))^2 + sin(5*V) %*% c(1,1,1) + cos(5*V) %*% c(1,1,1)))
+  #Y <- rbinom(n, size = 1, prob = 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1))))
+  ##################
+  ##################
+  Y <- data$R
+  A <- data$A
+  V <- as.matrix(data[, c("W1")])
+  X <- as.matrix(data[, c("W1", "W2", "W3")])
+  
+  Q1 <- data$gRtilde1
+  Q0 <- data$gRtilde0
+  Q <- data$gRtilde
+  g1 <- data$g
+  
+  lrnr_A <- Stack$new(Lrnr_xgboost$new(max_depth = 7), Lrnr_xgboost$new(max_depth = 3), Lrnr_xgboost$new(max_depth = 6), Lrnr_xgboost$new(max_depth = 5), Lrnr_xgboost$new(max_depth = 4))
+  lrnr_Y <-lrnr_A
+  lrnr_V <- Lrnr_gam$new(family = binomial())
+  task <- make_task(V, X, A, Y, folds = 10)
+  likelihood <- make_likelihood(task, lrnr_A ,lrnr_Y, lrnr_V, cv = T )
+  genr <- make_generator(likelihood)
+  task_RR <- genr(task, "validation")
+  basis_list <- make_fourier_basis_list(V)
+  
+  lrnr <- SL_learner_to_LRR_learner("SL.gam", deg.gam = 3)
+  
+  lrnr_lrr <- generate_plugin_learners(task_RR, basis_list, list(lrnr), task, likelihood, select_sieve = TRUE, screen.glmnet = F, cv = F)
+  
+  
+  lrnr_lrr <- lrnr_lrr$train(task_RR)
+  preds <- lrnr_lrr$predict(task_RR)
+  print(cor(preds, V))
+  eff_loss <- make_eff_loss(task, likelihood)
+  u <- max(V)
+  l <- min(V)
+  ys <- seq(-0.9,0.9,length=10)
+  sigmas <- c()
+  all_data <- task_RR$get_data()
+  for(y in ys) {
+    sigma <- get_h(V, y, preds, task_RR, task, likelihood)
+    sigmas <- c(sigmas, sigma)
+  }
+  
+  kernel <- function(x) {
+    fun <- function(i) {
+      y <- ys[i]
+      sigma <- sigmas[i]
+      v <- exp(-(y-x)^2/sigma^2) /  sqrt(2*3.14*sigma^2)
+      #v <- v + exp(-(y+x)^2/sigma^2) /  sqrt(2*3.14*sigma^2)
+      v
+    }
+    sapply(1:length(ys), fun)
+  }
+  true <- colMeans(kernel(data_full$W1) *  log(lrnr1$predict(tsk)/ lrnr0$predict(tsk))) / colMeans(kernel(data_full$W1))
+  
+  all_data <- task_RR$get_data()
+  Q1V <- all_data$Q1V
+  Q0V <- all_data$Q0V
+  Q1 <- all_data$Q1
+  Q0 <- all_data$Q0
+  g1 <- all_data$g1
+  update <- preds
+  RR <- exp(update)
+  clever_covariates <-   (Q1V + Q0V)/(Q1V*Q0V) * kernel(V)
+  EIC <- A/(g1) *(-1/(1+ RR))* (Y-Q1) + (1-A)/((1-g1))*(RR/(1+ RR))*(Y - Q0) - (1/(1+ RR))*(Q1V) + (RR/(1+ RR))*(Q0V) 
+  weights <- apply(as.vector(EIC)*clever_covariates,2,sd)
+  print(weights)
+  max_eps <- 5e-3
+  for(i in 1:20) {
+    RR <- exp(update)
+    clever_covariates <-   (Q1V + Q0V)/(Q1V*Q0V) * kernel(V) 
+    EIC <- A/(g1) *(-1/(1+ RR))* (Y-Q1) + (1-A)/((1-g1))*(RR/(1+ RR))*(Y - Q0) - (1/(1+ RR))*(Q1V) + (RR/(1+ RR))*(Q0V) 
+    dir <- colMeans(as.vector(EIC)*clever_covariates) / weights
+    dir <- dir/sqrt(mean(dir^2) )
+    clever_covariates_one_dim <- clever_covariates %*% dir / colMeans(kernel(V))
+    
+    risk0 <- mean(eff_loss(update + 0))
+    
+    risk <- function(epsilon) {
+      # RR <- exp(preds + epsilon*1)
+      # score <- A/(g1) *(-1/(1+ RR))* (Y-Q1) + (1-A)/((1-g1))*(RR/(1+ RR))*(Y - Q0) - (1/(1+ RR))*(Q1) + (RR/(1+ RR))*(Q0) 
+      # score <- abs(mean(score * clever_covariates))
+      loss <- (eff_loss(update  + epsilon*clever_covariates_one_dim ))
+      loss <- loss 
+      risk <- mean(loss)
+    }
+    
+    
+    
+    optim_fit <- optim(
+      par = list(epsilon = 0 ), fn = risk,
+      lower = -max_eps, upper = max_eps,
+      method = "Brent")
+    print(risk0)     
+    print(optim_fit$value)
+    print(risk(optim_fit$par))
+    epsilon <- optim_fit$par
+    update <- update + epsilon* (clever_covariates%*% dir)
+    print(optim_fit$par)   
+    RR <- exp(update)
+    kern <- kernel(V)
+    score1 <- A/(g1) *(-1/(1+ RR))* (Y-Q1) + (1-A)/((1-g1))*(RR/(1+ RR))*(Y - Q0) - (1/(1+ RR))*(Q1V) + (RR/(1+ RR))*(Q0V) 
+    print(mean(score1))
+    score1a <- clever_covariates*as.vector(score1)
+    print(("Score"))
+    print(colMeans(score1a))
+    print(sqrt(mean((colMeans(score1a)/ weights)^2)))
+    print(1/sqrt(n)/log(n))
+    if(sqrt(mean((colMeans(score1a)/ weights)^2)) <= 1/sqrt(n)/log(n)){
+      break
+    }
+    if(abs(optim_fit$par) < 1e-8) {
+      max_eps <- max_eps/3
+    }
+  }
+  
+  est_X <- kern * as.vector(update)
+  psi <- colMeans(est_X)
+  EIC <- score1a + t(t(est_X) - psi)
+  EIC <- t(t(EIC) / colMeans(kern)) + t( -(psi/colMeans(kern)^2)*(t(kern) - colMeans(kern)))
+  psi <- psi/colMeans(kern)
+  
+  print(colMeans(EIC))
+  radius <- 1.96*apply(EIC,2,sd)/sqrt(n)
+  print(sd(EIC))
+  upper <- psi + radius
+  lower <- psi - radius
+  ests <- cbind(psi, lower, upper)
+  colnames(ests) <- c("psi", "lower", "upper")
+  print(ests)
+  output_list[[i]] <- ests
+  pass <- (true >= lower) & (true <= upper)
+  passed <- cbind(passed, pass)
+  print(apply(passed,1,table))
+  print(rowMeans(passed))
+}
+```
+
+```{r}
+#plot(update, preds)
+RR <- exp(update)
+kern <- kernel(V)
+score1 <- A/(g1) *(-1/(1+ RR))* (Y-Q1) + (1-A)/((1-g1))*(RR/(1+ RR))*(Y - Q0) - (1/(1+ RR))*(Q1) + (RR/(1+ RR))*(Q0) 
+score1 <- kern*score1
+est_X <- kern * update
+psi <- mean(est_X)
+EIC <- score1 + est_X - psi
+radius <- 1.96*sd(EIC)/sqrt(n)
+upper <- psi + radius
+lower <- psi - radius
+ests <- c(psi, lower, upper)
+```

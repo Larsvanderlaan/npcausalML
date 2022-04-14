@@ -1,0 +1,223 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(R6)
+n <- 10
+X <- data.frame(X  = rnorm(n), Y= rnorm(n), Z  = rnorm(n))
+
+basis <- fourier_basis$new()
+basis <- basis$train(X)
+as.data.frame(basis$predict(X))
+```
+
+
+```{r}
+ 
+      max_degrees <- c(2 )
+      orders <- c(2 )
+
+       
+      var_names <- c("X", "Y")
+      nbasis_per_var <- 6
+      indices <- 1:nbasis_per_var
+      basis_names <- lapply(var_names, function(var) { paste0(var, indices)})
+      names(basis_names) <- var_names
+       
+      formula_of_degree <- function(i) {
+        mdegree <- max_degrees[i]
+        order <- orders[i]
+        terms_list <- c()
+        for(deg in  mdegree) {
+          terms <- combn(var_names, deg, function(...){
+            basis_names_reduced <- lapply(basis_names[...], function( names ) {
+              return(names[1:(2*order)])
+            })
+            fun <- function(x,y){
+              vals <- sort(c(x,y))
+              paste0(vals[1],"*",vals[2])
+            }
+            
+            fun <- Vectorize(fun)
+            as.vector(unlist(reduce(basis_names_reduced, outer,  FUN = fun)))
+          })
+          terms_list <- c(terms_list, as.vector(unlist(terms)))
+        }
+        terms_list
+          
+        }
+       formula <- paste0("~ ", paste0(sort(unique(as.vector(unlist(sapply(1:length(orders), formula_of_degree))))), collapse = " + "), " -1")
+       formula
+```
+
+
+
+
+
+```{r}
+ 
+n <- 25500
+V <- as.matrix(replicate(3,runif(n, min = -1, max = 1)))
+X <- V
+A <- rbinom(n, size = 1, prob = 0.1+ 0.8*plogis(sin(3*V) %*% c(1,1,1) + cos(3*V) %*% c(1,1,1)))
+Y <- rbinom(n, size = 1, prob = 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1))))
+
+
+
+
+task <- make_task(V, X, A, Y)
+likelihood <- make_likelihood(task, Lrnr_xgboost$new(max_depth = 4), Lrnr_xgboost$new(max_depth = 4), cv = T)
+genr <- make_generator(likelihood)
+task_RR <- genr(task, "validation")
+
+task_RR$data
+Q <- 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1)))
+
+A <- 1
+Q1 <- 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1)))
+A <- 0
+Q0 <- 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1)))
+
+g1 <- 0.1+ 0.8*plogis(sin(3*V) %*% c(1,1,1) + cos(3*V) %*% c(1,1,1))
+```
+
+
+```{r, include = F}
+lrnr_sieve <- Lrnr_adaptive_sieve$new(stratify_by = "A", mult_by = "ginv")
+lrr_plugin <- LRR_plugin_task_generator$new(sieve_learner = lrnr_sieve)
+lrr_plugin <- lrr_plugin$train(task_RR)
+all_data <- lrr_plugin$chain(task_RR)$get_data()
+```
+
+
+```{r}
+lrnr_sieve <- Lrnr_adaptive_sieve$new(mult_by = c("Qg1", "Qg0"))
+lrr_IPW <- LRR_IPW_task_generator$new(sieve_learner = lrnr_sieve)
+lrr_IPW <- lrr_IPW$train(task_RR)
+
+```
+
+```{r}
+
+all_data <- lrr_IPW$chain(task_RR)$get_data()
+
+```
+
+```{r}
+ 
+mean((all_data$A - all_data[[grep("_g1$", colnames(all_data), value = TRUE)]]) * all_data$Qg1)
+mean((all_data$A - all_data[[grep("_g1$", colnames(all_data), value = TRUE)]]) * all_data$Qg0)
+eff_loss <- make_eff_loss(task, likelihood)
+g1star <- all_data[[grep("_g1$", colnames(all_data), value = TRUE)]]
+g1est <- ifelse(A==1, all_data$g, 1-all_data$g)
+mean((g1star - g1)^2)
+mean((g1est - g1)^2)
+
+print("l")
+ 
+Q1 <- all_data$Q1
+Q0 <- all_data$Q0
+A <- all_data$A
+ 
+g <- all_data$g
+LRR <- 1
+C1 <- A/g * (Y - Q) + Q1
+C2 <- C1 + (1-A)/g * (Y - Q) + Q0
+loss_DR <- C1*-1*LRR + C2 * log(1 + exp(LRR))
+
+loss_IPW <- Y/g * ( log(1 + exp(LRR)) - LRR*A)
+
+mean(loss_DR)
+mean(loss_IPW)
+
+
+g <-   ifelse(A==1, g1star, 1- g1star)
+
+LRR <- 1
+C1 <- A/g * (Y - Q) + Q1
+C2 <- C1 + (1-A)/g * (Y - Q) + Q0
+loss_DR <- C1*-1*LRR + C2 * log(1 + exp(LRR))
+
+loss_IPW <- Y/g * ( log(1 + exp(LRR)) - LRR*A)
+
+mean(loss_DR)
+mean(loss_IPW)
+```
+
+
+```{r}
+all_data
+mean(all_data$A*(all_data$Y - all_data$Q)*all_data$ginv)
+mean((1-all_data$A)*(all_data$Y - all_data[[grep("Qnew0", colnames(all_data), value = TRUE)]])*all_data$ginv)
+
+mean((all_data$A)*(all_data$Y - all_data[[grep("Qnew1", colnames(all_data), value = TRUE)]])*all_data$ginv)
+print("q")
+
+mean((all_data[[grep("Qnew$", colnames(all_data), value = TRUE)]] - Q)^2)
+mean((all_data[["Q"]] - Q)^2)
+print("q1")
+x<- round(cbind(data.frame(a=all_data[[grep("Qnew1", colnames(all_data), value = TRUE)]][all_data$A==0]),data.frame(b=all_data[["Q1"]][all_data$A==0]),Q1[all_data$A==0]),3)
+mean((x$a - x[[3]])^2)
+mean((x$b - x[[3]])^2)
+x
+x <- round(cbind(data.frame(a=all_data[[grep("Qnew1", colnames(all_data), value = TRUE)]][all_data$A==1]),data.frame(b=all_data[["Q1"]][all_data$A==1]), Q1[all_data$A==1]),3)
+mean((x$a - x[[3]])^2)
+mean((x$b - x[[3]])^2)
+x
+
+print("q0")
+x<- round(cbind(data.frame(a = all_data[[grep("Qnew0", colnames(all_data), value = TRUE)]][all_data$A==1]),data.frame( b= all_data[["Q0"]][all_data$A==1]),Q0[all_data$A==1]),3)
+mean((x$a - x[[3]])^2)
+mean((x$b - x[[3]])^2)
+x<- round(cbind(data.frame(a=all_data[[grep("Qnew0", colnames(all_data), value = TRUE)]][all_data$A==0]),data.frame(b=all_data[["Q0"]][all_data$A==0]), Q0[all_data$A==0]),3)
+mean((x$a - x[[3]])^2)
+mean((x$b - x[[3]])^2)
+```
+
+
+"q"
+[1] 0.002361216
+[1] 0.00261525
+[1] "q1"
+[1] 0.003317166
+[1] 0.003524246
+[1] 0.002145659
+[1] 0.002290309
+[1] "q0"
+[1] 0.002787306
+[1] 0.003137731
+[1] 0.002593358
+[1] 0.002965729
+
+```{r}
+
+task_RR$get_data(,"ginv")
+task_RR$get_data(,"g1")
+task_RR$get_data(,"g")
+1/task_RR$get_data(,"g")
+data.frame(g1)
+```
+
+
+[1] "q"
+[1] 0.00572068
+[1] 0.006042347
+[1] "q1"
+[1] 0.007172086
+[1] 0.006845066
+[1] 0.00560023
+[1] 0.00544116
+[1] "q0"
+[1] 0.005889475
+[1] 0.006589799
+[1] 0.005848704
+[1] 0.006678767
+

@@ -1,0 +1,87 @@
+---
+title: "Untitled"
+output: html_document
+date: '2022-04-13'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+ n <- 5000
+  W1 <- runif(n, -1 , 1)
+  W2 <- runif(n, -1 , 1)# rbinom(n, 1 , plogis(W1))
+  W <- cbind(W1, W2)
+  A <- rbinom(n, 1 , plogis(0.5*(W1 + W2 )))
+  Y <- rpois(n, plogis( W1 + W2 ) * exp(A*(1+ 0.5*(sin(5*W1) + cos(5*W2)))))
+  quantile(Y)
+  LRR <- (1+ 0.5*(sin(5*W1) + cos(5*W2)))
+  true_coefs <- c(1, 0.5, 0.5)
+  R <- as.numeric(1:n %in% c(which(Y>0), which(Y==0)[rbinom(sum(Y==0), size = 1, prob = 0.5)==1]))
+  R <- rep(1,n)
+  pR0 <- mean(R[Y==0])
+  pR1 <- mean(R[Y>0])
+  weights <- R / ifelse(Y>0, pR1, pR0)
+  
+  
+  sl3_Learner_EYAW <- Lrnr_hal9001$new(family = "poisson", smoothness_orders =1, num_knots = c(10,5), max_degree = 2)
+  sl3_Learner_pA1W <- Lrnr_gam$new()
+  
+  
+  list_of_sieves <- list(NULL, fourier_basis$new(orders = c(3,1)))
+  
+  outcome_function_plugin <- function(A, Y, EY1W, EY0W, pA1W) {
+    EY1W  / (EY1W + EY0W)
+  }
+  weight_function_plugin <- function(A, Y, EY1W, EY0W, pA1W) {
+     (EY1W + EY0W)
+  }
+  outcome_function_IPW <- function(A, Y, EY1W, EY0W, pA1W) {
+    A
+  }
+  weight_function_IPW <- function(A, Y, EY1W, EY0W, pA1W) {
+     pA <- ifelse(A==1, pA1W, 1 - pA1W)
+     Y / pA
+  }
+  
+design_function_sieve_plugin <- function(X,A , Y, EY1W , EY0W , pA1W ) {
+    cbind(A* X, X*(1-A))
+  }
+design_function_sieve_IPW <- function(X,A , Y, EY1W , EY0W , pA1W ){
+    pA0 <- 1-pA1W
+     cbind(EY1W/pA1W * X, EY0W/pA0 * X)
+}
+weight_function_sieve_plugin <- function(A , Y, EY1W , EY0W , pA1W ){
+     1/ifelse(A==1,pA1W, 1- pA1W)
+} 
+weight_function_sieve_IPW <- function(A , Y, EY1W , EY0W , pA1W ){
+     return(rep(1,length(A)))
+} 
+
+DR_loss_function <- function(theta, A , Y, EY1W , EY0W , pA1W){
+  LRR <- theta
+  EY <- ifelse(A==1, EY1W, EY0W)
+  plugin_risk <- (EY0W + EY1W) * log(1 + exp(LRR)) - EY1W * LRR
+  score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR)) - LRR)*(Y - EY)
+}
+
+  
+  
+  
+  fit_RR <- npcausalML(list(Lrnr_glm$new()),
+                 W= W, A = A, Y = Y, V = W, weights = weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, outcome_type = "continuous", list_of_sieves = list_of_sieves,cross_validate_LRR = TRUE,
+                 outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin, 
+                 outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, 
+                 design_function_sieve_plugin = design_function_sieve_plugin, 
+                 weight_function_sieve_plugin = weight_function_sieve_plugin, 
+                 design_function_sieve_IPW = design_function_sieve_IPW, weight_function_sieve_IPW = weight_function_sieve_IPW, transform_function = qlogis,
+                 family_risk_function = poisson(),
+                 DR_loss_function = DR_loss_function) 
+
+```
+
+
+ 

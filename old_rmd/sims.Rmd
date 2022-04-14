@@ -1,0 +1,211 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(SuperLearner)
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+
+ 
+
+
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+
+lrnr_SL.glm<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm", outcome_type = variable_type("binomial"))
+
+lrnr_SL.xgboost <-  make_learner(Lrnr_pkg_SuperLearner, "SL.xgboost", outcome_type = variable_type("binomial"), max_depth = 4)
+lrnr_SL.earth1 <-  make_learner(Lrnr_pkg_SuperLearner, "SL.earth", outcome_type = variable_type("binomial"), degree = 1, pmethod = "forward")
+lrnr_SL.earth2 <-  make_learner(Lrnr_pkg_SuperLearner, "SL.earth", outcome_type = variable_type("binomial"), degree = 2, pmethod = "forward")
+lrnr_SL.gam1 <-  make_learner(Lrnr_pkg_SuperLearner, "SL.gam", outcome_type = variable_type("binomial"), deg.gam=4)
+
+
+lrnr_SL.gam2 <-  make_learner(Lrnr_pkg_SuperLearner, "SL.gam", outcome_type = variable_type("binomial"), deg.gam=2)
+
+
+```
+
+```{r}
+### working designs IPW
+  #A <- rbinom(n, size = 1, prob = 0.2+ 0.6*plogis(sin(5*(V %*% c(1,1,1))) + 0.5*cos(5*(V %*% c(1,1,1)))^2 + sin(5*V) %*% c(1,1,1) + cos(5*V) %*% c(1,1,1)))
+  #Y <- rbinom(n, size = 1, prob = 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1))))
+
+
+  A <- rbinom(n, size = 1, prob = 0.15+ 0.65*plogis(sin(5*(V %*% c(1,-1,1))) + 0.5*cos(5*(V %*% c(-1,1,1)))^2 + sin(5*V) %*% c(1,1,-1) + cos(5*V) %*% c(1,1,1)))
+  Y <- rbinom(n, size = 1, prob = 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1))))
+
+```
+
+
+```{r, include = F}
+risks_all <- list()
+for(i in 1:50) {
+  # Generate data
+  n <- 5000
+#   V <- as.matrix(replicate(3,runif(n, min = -1, max = 1)))
+#   X <- V
+#   A <- rbinom(n, size = 1, prob = 0.12+ 0.75*plogis(sin(5*(V^2 %*% c(-1,-1,-1))) + sin(5*(V %*% c(1,-1,1))) + 0.5*cos(5*(V %*% c(-1,1,1)))^2 + sin(5*V) %*% c(1,1,-1) + cos(5*V) %*% c(1,1,1)))
+#   Y <- rbinom(n, size = 1, prob = 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1))))
+#  
+# bound <- Vectorize(tmle3::bound)
+D <- DAG.empty()
+D <- DAG.empty()
+ 
+
+# hard_additive
+theta = function(W1, W2, W3) {0.5*(W1+cos(4*W1)) + 0.5*sin(4*W2) + 0.5*sin(4*W3)}
+ 
+theta <- Vectorize(theta)
+
+key <- "hard_additive"
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "runif", min = -1, max = 1) +
+  node("W3", distr = "runif", min = -1, max = 1) +
+  node("g", distr = "rconst", const = 0.15 + 0.75*plogis(cos((W1+W2 + W3)*5) * sin((W1+W2 + W3)*5) + cos((W1+W2 + W3)*5) + sin((W1+W2 + W3)*5) + sin(W1*5) + W1*sin(W1*5) + cos(W2*5) + 2*W1*W2 - sin(W3*5) + sin(5*W1*W3) + 2*W1*W2*W3 + W3*sin(W1*5) + cos(W2*4)*sin(W1*5) ) ) +
+  node("A", distr = "rbinom", size = 1, prob = g )+
+   node("phi", distr = "rconst", const = (1+W1 + W2)*sin(W1*5)  + (1+W2 + W3)*cos(5*W2) + 0.5*exp(W1*W2) + cos(6*W1*W3)+ sin(6*W3*W2) + sin(6*W1*W2) + W3*sin(5*W3) + W2*sin(5*W3)) +
+  node("theta", distr = "rconst", const =  theta(W1,W2,W3))+
+    node("gRtilde0", distr = "rconst",  const = (-(exp(theta) + 1)*exp(phi) + (exp(2*phi)*(exp(theta) + 1)^2 + 4*(exp(theta + phi))*(1 - exp(phi)))^(0.5))/(2*exp(theta)*(1-exp(phi)))
+           ) +
+   node("gRtilde1", distr = "rconst",  const =    gRtilde0*exp(theta)) +
+   node("gRtilde", distr = "rconst",  const =   A*gRtilde1 + (1-A)*gRtilde0) +
+   node("gR", distr = "rconst",  const =  gRtilde ) +
+  node("R", distr = "rbinom", size = 1, prob = gR)+
+  node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
+
+setD <- set.DAG(D, vecfun = c("bound", "round", "theta"))
+data <- sim(setD, n = n)
+ 
+  ##################
+  ###################   WORKS
+  #A <- rbinom(n, size = 1, prob = 0.2+ 0.6*plogis(sin(5*(V %*% c(1,1,1))) + 0.5*cos(5*(V %*% c(1,1,1)))^2 + sin(5*V) %*% c(1,1,1) + cos(5*V) %*% c(1,1,1)))
+  #Y <- rbinom(n, size = 1, prob = 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1))))
+    ##################
+    ##################
+  Y <- data$R
+  A <- data$A
+  V <- as.matrix(data[, c("W1", "W2", "W3")])
+  X <- V
+  
+  Q1 <- data$gRtilde1
+  Q0 <- data$gRtilde0
+  Q <- data$gRtilde
+  g1 <- data$g
+  
+  lrnr_A <- Lrnr_hal9001$new(max_degree = 1, smoothness_orders = 1, num_knots = c(10, 5))
+  lrnr_Y <- Lrnr_hal9001$new(max_degree = 1, smoothness_orders = 1, num_knots = c(10, 5))
+  lrnr_Y <- Stack$new(Lrnr_xgboost$new(max_depth = 7), Lrnr_xgboost$new(max_depth = 3), Lrnr_xgboost$new(max_depth = 6), Lrnr_xgboost$new(max_depth = 5), Lrnr_xgboost$new(max_depth = 4))
+  lrnr_A <- lrnr_Y
+  
+  task <- make_task(V, X, A, Y, folds = 5)
+  likelihood <- make_likelihood(task, lrnr_A ,lrnr_Y, lrnr_V = NULL, cv = T)
+  genr <- make_generator(likelihood)
+  task_RR <- genr(task, "validation")
+  # Q <- 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1)))
+  # A <- 1
+  # Q1 <- 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1)))
+  # A <- 0
+  # Q0 <- 0.05 + 0.9*plogis(0.9*(-0.5 + A + 0.3*A*(sin(3.5*V) %*% c(1,-1,1) + cos(3.5*V) %*% c(1,-1,1)) + sin(3*V) %*% c(-1,1,1) + cos(3*V) %*% c(1,1,-1)))
+  #  A <- task$get_tmle_node("A")
+  # g1 <- 0.12+ 0.75*plogis(sin(5*(V^2 %*% c(-1,-1,-1))) + sin(5*(V %*% c(1,-1,1))) + 0.5*cos(5*(V %*% c(-1,1,1)))^2 + sin(5*V) %*% c(1,1,-1) + cos(5*V) %*% c(1,1,1))
+  
+  # 
+  basis1 <- fourier_basis$new(orders = c(1,0,0), max_degrees = c(1,2,3))
+  basis2 <- fourier_basis$new(orders = c(1,1,0), max_degrees = c(1,2,3))
+  basis3 <- fourier_basis$new(orders = c(2,1,0), max_degrees = c(1,2,3))
+  basis4 <- fourier_basis$new(orders = c(3,1,0), max_degrees = c(1,2,3))
+  basis5 <- fourier_basis$new(orders = c(3,2,0), max_degrees = c(1,2,3))
+  basis6 <- fourier_basis$new(orders = c(3,2,1), max_degrees = c(1,2,3))
+  basis_list <- list("k=0" = NULL,"k=1"= basis1,
+                     "k=2" = basis2, 
+                     "k=3" =basis3,
+                     "k=4" =basis4,
+                     "k=5" =basis5,
+                     "k=6" =basis6)
+ 
+  lrnr <- Stack$new(Lrnr_weight_helper$new(lrnr = Lrnr_LRR_xgboost$new(max_depth = 4, nrounds = 20), name = "xgboost_4"),
+                    Lrnr_weight_helper$new(lrnr =Lrnr_LRR_xgboost$new(max_depth = 3, nrounds = 20), name = "xgboost_3"),
+            make_learner(Pipeline,lrnr_SL.gam1, Lrnr_chainer_link$new()),
+   Lrnr_weight_helper$new(lrnr = Lrnr_LRR_hal9001$new(max_degree = 1, smoothness_orders =1, num_knots = c(15)), name = "hal9001_1"),
+                       make_learner(Pipeline,lrnr_SL.gam2, Lrnr_chainer_link$new()),
+                                                   make_learner(Pipeline,lrnr_SL.glm, Lrnr_chainer_link$new()),
+   make_learner(Pipeline,lrnr_SL.inter, Lrnr_chainer_link$new())
+                                                  
+  )
+  lrnrs <- list()
+  for(name in names(basis_list)) {
+    basis <- basis_list[[name]]
+    lrr_IPW <- LRR_IPW_task_generator$new(sieve_basis = basis, name = name)
+ 
+    lrnrs <- c(lrnrs, list(Pipeline$new(lrr_IPW, lrnr$clone())))
+    
+      
+    lrr_plugin <- LRR_plugin_task_generator$new(sieve_basis = basis, name = name)
+     
+    lrnrs <- c(lrnrs, list(Pipeline$new(lrr_plugin, lrnr$clone())))
+    
+    
+  }
+  lrnr_lrr <- make_learner(Stack, lrnrs)
+  
+  lrnr_lrr <- lrnr_lrr$train(task_RR)
+  preds <- lrnr_lrr$predict(task_RR)
+  
+  
+  risks <- apply(preds, 2 , function(preds) {
+  f <- preds
+  gRtilde1 <- Q1
+  gRtilde0 <- Q0
+  gRtilde0 <- bound(gRtilde0, 0.01)
+  gRtilde1 <- bound(gRtilde1, 0.01)
+  f0 = log(gRtilde1/gRtilde0)
+  loss <- (f0-f)^2
+  return(mean(loss))
+})
+  risks_all[[i]] <- risks
+  
+  
+}
+
+
+
+```
+
+```{r}
+out <- data.frame(risks=(rowMeans(do.call(cbind, risks_all))))
+out <- out[order(out$risks),,drop = F]
+out
+```
+
+```{r}
+
+lr <- LRR_plugin_task_generator$new(sieve_basis = basis_list[[3]], name = "name")
+lr <- lr$train(task_RR)
+lr$chain(task_RR)$data
+quantile(lr$chain(task_RR)$data$weights)
+```
+
+```{r, include = F}
+lrnr_sieve <- Lrnr_adaptive_sieve$new(basis_generator = basis_list[[3]],mult_by = c("Qg1", "Qg0"))
+lrr_IPW <- LRR_IPW_task_generator$new(sieve_learner = lrnr_sieve, name = "j")
+lrr_IPW <- lrr_IPW$train(task_RR)
+dat <- lrr_IPW$chain(task_RR)$get_data()
+```
+
+```{r}
+mean((dat[[grep("_g1", colnames(dat), value = T)]]- g1)^2)
+
+ginit <- ifelse(A==1, dat$g , 1-dat$g )
+ mean((ginit - g1)^2)
+ 
+````
+
+
+
+
+

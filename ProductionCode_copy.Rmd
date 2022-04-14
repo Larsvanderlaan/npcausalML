@@ -1,0 +1,419 @@
+---
+title: "RR"
+output: html_document
+date: '2022-03-01'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Code design
+
+```{r}
+# Mock data
+n <- 500
+W1 <- runif(n, -1 , 1)
+W2 <- rbinom(n, 1 , plogis(W1))
+W <- cbind(W1, W2)
+A <- rbinom(n, 1 , plogis(W1 + W2 - 0.5))
+Y <- rbinom(n, 1, plogis(-2 + W1 + W2 + A*(1 + W1 + W2)))
+R <- as.numeric(1:n %in% c(which(Y==1), which(Y==0)[rbinom(sum(Y==0), size = 1, prob = 0.5)==1]))
+weights <- R/ifelse(Y==1, 1, 0.5)
+
+keep <- R!=0
+W <- W[keep,]
+A <- A[keep]
+Y <- Y[keep]
+weights <- weights[keep]
+
+lrnr <- Lrnr_glmnet$new(formula = ~.^2)
+likelihood <- estimate_initial_likelihood(W, A, Y, weights, lrnr, lrnr)
+
+data <- data.table(W)
+covariates <- colnames(W)
+data$Z <- runif(nrow(data))
+task <- sl3_Task$new(data, covariates = covariates, outcome = "Z",  outcome_type = "binomial")
+
+
+```
+
+```{r}
+library(sl3)
+library(data.table)
+library(delayed)
+library(stringr)
+library(origami)
+ 
+
+#' Function to compute initial estimates of nuisance functions.
+#' @param W A column-named matrix of baseline variables.
+#' @param A A binary vector with values in {0,1} encoding the treatment assignment.
+#' @param Y A numeric vector storing the outcome values.
+#' @param sl3_Learner_pA1 A \code{sl3_Learner} object from the \code{tlverse/sl3} R github package that specifies the machine-learning algorithm for learning the propensity score `P(A = 1 | W)`
+#' @param sl3_Learner_EY A \code{sl3_Learner} object from the \code{tlverse/sl3} R github package that specifies the machine-learning algorithm for learning the outcome conditional mean `E[Y | A, W]`. NOTE: the treatment arms are pooled in the regression. See the preprocessing sl3_Learner \code{Lrnr_stratified} if you wish to stratify the estimation by treatment.
+#' @param folds A number representing the number of folds to use in cross-fitting or a fold object from the package \code{tlverse/origami}. This parameter will be passed to internal \code{sl3_Task} objects that are fed to the code{sl3_Learner}s.
+estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1, sl3_Learner_EY, folds = 10) {
+  
+  data <- data.table(W, A = A, Y = Y, weights = weights)
+  covariates <- colnames(W)
+  
+  task_pA1 <- sl3_Task$new(data, covariates = covariates, outcome = "A", outcome_type = "binomial", weights = "weights", folds = folds)
+  folds <- task_pA1$folds
+  task_EY <- sl3_Task$new(data, covariates = c(covariates, "A"), outcome = "Y", weights = "weights", folds = folds)
+  sl3_Learner_pA1 <- delayed_learner_train(sl3_Learner_pA1, task_pA1)
+  sl3_Learner_EY <- delayed_learner_train(sl3_Learner_EY, task_EY)
+  delayed_learner_list <- bundle_delayed(list(sl3_Learner_pA1,sl3_Learner_EY ))
+  trained_learners <- delayed_learner_list$compute(progress = FALSE)
+  
+  sl3_Learner_pA1_trained <- trained_learners[[1]]
+  sl3_Learner_EY_trained <- trained_learners[[2]]
+  
+  data1 <- data.table::copy(data)
+  data0 <- data.table::copy(data)
+  data1$A <- 1
+  data0$A <- 0
+  task_EY1 <- sl3_Task$new(data1, covariates = c(covariates, "A"), outcome = "Y", weights = "weights", folds = folds)
+  task_EY0 <- sl3_Task$new(data0, covariates = c(covariates, "A"), outcome = "Y", weights = "weights", folds = folds)
+  
+  EY <- sl3_Learner_EY_trained$predict(task_EY)
+  EY1 <- sl3_Learner_EY_trained$predict(task_EY1)
+  EY0 <- sl3_Learner_EY_trained$predict(task_EY0)
+  pA1 <- sl3_Learner_pA1_trained$predict(task_pA1)
+  if(any(EY != ifelse(A==1, EY1, EY0))) {
+    stop("EY and EY1, EY0 are inconsistent.")
+  }
+  
+  
+  internal <-  list(task_pA1 = task_pA1, task_EY = task_EY, sl3_Learner_pA1_trained = sl3_Learner_pA1_trained, sl3_Learner_EY_trained = sl3_Learner_EY_trained, folds = folds)
+  output <- list(pA1 = pA1, EY1 = EY1, EY0 = EY0, internal = internal)
+   return(output)
+}
+
+#basis_generator <- fourier_basis$new(orders = c(3,0,0))
+
+# TODO bounds
+# TODO binary variable
+compute_plugin_and_IPW_sieve_nuisances <- function(W, A, Y, EY1, EY0, pA1, weights, basis_generator, family = binomial(), debug = TRUE) {
+  if(is.null(basis_generator)) {
+    return(list(pA1_star = pA1, EY1_star = EY1, EY0_star = EY0, sieve = "no_sieve"))
+  }
+  # Compute sieve-transformed design matrix
+   
+  V <- basis_generator$set(W)$eval(W)
+ 
+  # Compute data-adaptive sieve
+  V_plugin <- cbind(A*V, (1-A)*V)
+  
+  EY <- ifelse(A==1, EY1, EY0)
+  pA0 <- 1 - pA1
+  pA <- ifelse(A==1, pA1, pA0)
+  sieve_fit_plugin <- glm.fit(V_plugin, Y, weights = weights/pA, offset = family$linkfun(EY), family = family, intercept = F)
+  beta_plugin <- coef(sieve_fit_plugin)
+  beta_plugin[is.na(beta_plugin)] <- 0
+  beta1_plugin <- beta_plugin[1:ncol(V)]
+  beta0_plugin <- beta_plugin[-(1:ncol(V))]
+   
+  
+  EY1_star <- as.vector(family$linkinv(family$linkfun(EY1) + V %*% beta1_plugin))
+  EY0_star <- as.vector(family$linkinv(family$linkfun(EY0) + V %*% beta0_plugin))
+  
+  if(debug) {
+    EYstar <- ifelse(A==1, EY1_star, EY0_star )
+    print("Sieve scores plugin")
+    print(colMeans(weights/pA*V_plugin*(Y - EYstar)))
+  }
+  
+  V_IPW <- cbind(EY1/pA1 * V, EY0/pA0 * V)
+  sieve_fit_IPW <- glm.fit(V_IPW, A, weights = weights, offset = qlogis(pA1), family = binomial(), intercept = F)
+  beta_IPW <- coef(sieve_fit_IPW)
+  beta_IPW[is.na(beta_IPW)] <- 0
+  pA1_star <- as.vector(plogis(qlogis(pA1) + V_IPW %*% beta_IPW))
+  if(debug) {
+    print("Sieve scores IPW")
+    print(colMeans(weights*V_IPW*(A - pA1_star)))
+  }
+  
+  output <- list(pA1_star = pA1_star, EY1_star = EY1_star, EY0_star = EY0_star, sieve = basis_generator$name)
+   
+  
+}
+
+estimate_LRR_using_ERM <- function(W, A, Y,  EY1, EY0, pA1, weights, sl3_LRR_Learner_binomial, learning_method = c("plugin", "IPW"), Wpred = W, untransform_logit = TRUE) {
+  learning_method <- match.arg(learning_method)
+  data <- as.data.table(W)
+   
+  covariates <- colnames(data)
+  if(learning_method == "plugin") {
+    pseudo_outcome <- EY1 / (EY1 + EY0)
+    pseudo_weights <- weights * (EY1 + EY0)
+    data$pseudo_outcome <- pseudo_outcome
+    data$pseudo_weights <- pseudo_weights
+    task_LRR <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights", outcome_type = "quasibinomial")
+  }
+  else if(learning_method == "IPW") {
+    pseudo_outcome <- A
+    pseudo_weights <- weights * Y / ifelse(A==1, pA1, 1 - pA1)
+    data$pseudo_outcome <- pseudo_outcome
+    data$pseudo_weights <- pseudo_weights
+    task_LRR <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights", outcome_type = "binomial")
+  }
+  task_LRR_pred <- sl3_Task$new(as.data.table(Wpred), covariates = covariates)
+  
+  sl3_Learner_LRR_trained <- sl3_LRR_Learner_binomial$train(task_LRR)
+  LRR <- sl3_Learner_LRR_trained$predict(task_LRR)
+  LRR_pred <- sl3_Learner_LRR_trained$predict(task_LRR_pred)
+  if(untransform_logit) {
+    LRR <- qlogis(LRR)
+    LRR_pred <- qlogis(LRR_pred)
+  }
+  
+  output <- list(LRR_train = as.matrix(LRR), LRR_pred = as.matrix(LRR_pred), LRR_learner = sl3_Learner_LRR_trained)
+  return(output)
+}
+
+
+
+DR_risk_function_LRR <- function(LRR, A, Y, EY1, EY0, pA1, weights, debug = FALSE, return_loss = FALSE) {
+  LRR <- as.matrix(LRR)
+  if(!(nrow(LRR) == length(A) && nrow(LRR) == length(EY1))) {
+    stop("Input lengths dont match")
+  }
+  EY <- ifelse(A==1, EY1, EY0)
+  plugin_risk <- (EY0 + EY1) * log(1 + exp(LRR)) - EY1 * LRR
+  score_comp <- (A/pA1)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1))*(log(1 + exp(LRR)) - LRR)*(Y - EY)
+  if(debug){
+    print(colMeans(weights * score_comp))
+  }
+  DR_loss <- weights * (plugin_risk + score_comp)
+  if(return_loss) {
+    return(DR_loss)
+  } else {
+    return(colMeans(DR_loss))
+  }
+}
+
+delayed_train_LRR_by_sieve <- function(learner_LRR, W, A, Y, weights, list_of_sieve_nuisances, Wpred = W) {
+    list_of_sieve_LRR <- lapply(list_of_sieve_nuisances, function(sieve_nuisances) {
+      EY1_star <- sieve_nuisances$EY1_star
+      EY0_star <- sieve_nuisances$EY0_star
+      pA1_star <- sieve_nuisances$pA1_star
+      
+      delayed_plugin_LRR <- delayed_fun(estimate_LRR_using_ERM)(W, A, Y,  EY1_star, EY0_star, pA1_star, weights, learner_LRR, learning_method = "plugin", Wpred = Wpred)
+      
+      delayed_IPW_LRR <- delayed_fun(estimate_LRR_using_ERM)(W, A, Y,  EY1_star, EY0_star, pA1_star, weights, learner_LRR, learning_method = "IPW", Wpred = Wpred)
+      
+    output <- (list( plugin = delayed_plugin_LRR, IPW = delayed_IPW_LRR))
+    })
+    sieve_names <- sapply(list_of_sieve_nuisances, `[[`, "sieve")
+    names(list_of_sieve_LRR) <- sieve_names
+    return(list_of_sieve_LRR)
+}
+
+delayed_train_LRR_learners <- function(W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves, Wpred = W) {
+  
+  list_of_sieve_nuisances <- lapply(list_of_sieves, function(sieve){
+    compute_plugin_and_IPW_sieve_nuisances(basis_generator = sieve, W = W, A = A, Y = Y, EY1 = EY1, EY0 = EY0, pA1 = pA1, weights = weights)})
+  list_of_sieve_nuisances 
+  
+  all_learners_delayed <- lapply(list_of_learners, delayed_train_LRR_by_sieve, list_of_sieve_nuisances = list_of_sieve_nuisances, W = W, A = A, Y = Y, weights = weights, Wpred = Wpred)
+  learner_names <- lapply(list_of_learners, `[[`, "name")
+  names(all_learners_delayed) <- paste0(learner_names)
+  return(all_learners_delayed)
+}
+
+
+delayed_train_LRR_fold_learners <- function(fold, W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves) {
+  index <- origami::training(fold = fold)
+  index_val <- origami::validation(fold = fold)
+  Wfull <- W
+  W <- Wfull[index,]
+  Wval <- Wfull[index_val,]
+  A <- A[index]
+  Y <- Y[index]
+  EY1 <- EY1[index]
+  EY0 <- EY0[index]
+  pA1 <- pA1[index]
+  weights <- weights[index]
+  
+  all_learners_delayed <- delayed_train_LRR_learners(W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves, Wpred = Wval)
+  return(all_learners_delayed)
+}
+
+
+
+choose_best_sieve_LRR <- function(trained_learner_list, learner_names, A, Y, EY1, EY0, pA1, weights) {
+  LRR_learners <- trained_learner_list
+  
+  
+  LRR_learners <- lapply(learner_names, function(learner_name) {
+    keep <- which(stringr::str_detect(names(LRR_learners), quotemeta(learner_name)))
+    
+    sieve_learners <- LRR_learners[keep]
+    
+    # Get LRR predictions on fold-specific training set for all sieves
+    # Single learner
+    all_LRR_training <- lapply(sieve_learners, `[[`, "LRR_train")
+    all_LRR_pred <- lapply(sieve_learners, `[[`, "LRR_pred")
+     
+    # Get DR risks on fold-specific training set for the LRR of the sieves
+    all_training_risks <- unlist(lapply(all_LRR_training, function(LRR) {
+      DR_risk_function_LRR(LRR, A, Y, EY1, EY0, pA1, weights)
+    }))
+    #print(all_training_risks)
+    print("min")
+    print(min(all_training_risks))
+    print(which.min(all_training_risks))
+    best_index <- which.min(all_training_risks)
+    #names(best_index) <- names(all_training_risks)
+    #print(names(all_training_risks)[best_index])
+    #out <- list(sieve_learners[[best_index]])
+    #names(out) <- names(all_training_risks)[best_index] 
+    all_LRR_training <- do.call(cbind, all_LRR_training)
+    colnames(all_LRR_training) <- names(all_training_risks)
+    #print(as.data.table(all_LRR_training))
+    all_LRR_pred <- do.call(cbind, all_LRR_pred)
+    return(list(LRR_train = all_LRR_training[,best_index], LRR_pred = all_LRR_pred[,best_index]))
+    
+    
+  })
+  names(LRR_learners) <- learner_names
+  LRR_learners
+}
+
+choose_best_sieve_LRR_all_folds <- function(folds, trained_learner_list, learner_names, A, Y, EY1, EY0, pA1, weights) {
+  output <- lapply(seq_along(folds), function(fold_number) {
+    fold <- folds[[fold_number]]
+    training_index <- origami::training(fold = fold)
+    keep <- which(stringr::str_detect(names(LRR_learners_by_fold), paste0("^", fold_number, "\\.", "+")))
+    LRR_learners <- LRR_learners_by_fold[keep]
+    LRR_learners <- choose_best_sieve_LRR(LRR_learners, learner_names, A[training_index], Y[training_index], EY1[training_index], EY0[training_index], pA1[training_index], weights[training_index])
+     
+    return(LRR_learners)
+    
+  })
+  names(output) <- seq_along(folds)
+  return(output)
+}
+```
+
+
+```{r, include = T}
+n <- 2500
+W1 <- runif(n, -1 , 1)
+W2 <- runif(n, -1 , 1)# rbinom(n, 1 , plogis(W1))
+W <- cbind(W1, W2)
+A <- rbinom(n, 1 , plogis(0.5*(W1 + W2 )))
+Y <- rbinom(n, 1, plogis(-1 + W1 + W2 + A*(1 + W1 + W2)))
+LRR <- log(plogis(-1 + W1 + W2 + 1*(1 + W1 + W2)) / plogis(-1 + W1 + W2 + 0*(1 + W1 + W2)))
+           
+R <- as.numeric(1:n %in% c(which(Y==1), which(Y==0)[rbinom(sum(Y==0), size = 1, prob = 0.5)==1]))
+
+pR0 <- mean(R[Y==0])
+pR1 <- mean(R[Y==1])
+weights <- R / ifelse(Y==1, pR1, pR0)
+
+keep <- R!=0
+W <- W[keep,]
+A <- A[keep]
+Y <- Y[keep]
+weights <- weights[keep]
+LRR <- LRR[keep]
+lrnr <- make_learner(Pipeline, Lrnr_cv$new(Stack$new(Lrnr_xgboost$new(max_depth = 5), Lrnr_xgboost$new(max_depth = 4), Lrnr_xgboost$new(max_depth = 3))), Lrnr_cv_selector$new(loss_loglik_binomial))
+
+lrnr <- Lrnr_hal9001$new(max_degree = 2, smoothness_orders = 1, num_knots = c(2,1))
+likelihood <- estimate_initial_likelihood(W, A, Y, weights, lrnr, lrnr)
+lrnr <- Lrnr_glm$new(formula = ~.^2)
+EY1 <- likelihood$EY1
+EY0 <- likelihood$EY0
+pA1 <- likelihood$pA1
+data.table(EY1, plogis(-1 + W[,1] + W[,2] + 1*(1 + W[,1] + W[,2])),
+           EY0,  
+           plogis(-1 + W[,1] + W[,2] + 0*(1 + W[,1] + W[,2])))
+
+(data.table(EY1/EY0, exp(LRR)[R!=0]))
+
+pred <- estimate_LRR_using_ERM(W, A, Y,  EY1, EY0, pA1, weights,  Lrnr_glm$new(family = binomial()), learning_method = c("plugin"))
+quantile(exp(pred$LRR_train))
+
+pred <- estimate_LRR_using_ERM(W, A, Y,  EY1, EY0, pA1, weights,  Lrnr_glm$new(family = binomial()), learning_method = c("IPW"))
+quantile(exp(pred$LRR_train))
+
+
+ 
+```
+
+```{r, include = F}
+# 3 additive/main-term sieves up to order 3
+list_of_sieves <- list(
+  NULL,
+   fourier_basis$new(orders = c(1,0)),
+   fourier_basis$new(orders = c(2,0)),
+   fourier_basis$new(orders = c(1,1)),
+  fourier_basis$new(orders = c(2,1))
+)
+list_of_learners <- list(
+  Lrnr_gam$new(family = binomial()),
+  Lrnr_xgboost$new(max_depth = 5, objective = "reg:logistic" ),
+  Lrnr_hal9001$new(max_degree = 2, smoothness_orders = 1, num_knots = c(8,5), lambda = c(0.0005), fit_control = list(cv_select = FALSE) , family = binomial())
+)
+learner_names <- sapply(list_of_learners, `[[`, "name")
+
+
+full_fit_LRR <- delayed_train_LRR_learners(W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves, Wpred = W) 
+full_fit_LRR <- bundle_delayed(unlist(full_fit_LRR))$compute()
+all_LRR_full_best <- choose_best_sieve_LRR(full_fit_LRR, learner_names, A, Y, EY1, EY0, pA1, weights)
+#all_LRR_full <- do.call(cbind, lapply(full_fit_LRR, `[[`, "LRR_train"))
+
+#list_of_learners <- list(Lrnr_glm$new(family = binomial()))
+folds <- origami::make_folds(n=length(A))
+
+ 
+ 
+
+LRR_learners_by_fold <- lapply(folds, delayed_train_LRR_fold_learners, W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves )
+names(LRR_learners_by_fold) <- seq_along(folds)
+LRR_learners_by_fold <- unlist(LRR_learners_by_fold)
+learner_sieve_names <- names(LRR_learners_by_fold)
+LRR_learners_by_fold_delayed <- bundle_delayed(LRR_learners_by_fold)
+LRR_learners_by_fold <- LRR_learners_by_fold_delayed$compute()
+ 
+#names(LRR_learners_by_fold) <- learner_sieve_names
+```
+
+
+
+ 
+
+
+```{r, include = F}
+ 
+output <- choose_best_sieve_LRR_all_folds(folds, trained_learner_list, learner_names, A, Y, EY1, EY0, pA1, weights) 
+
+
+ 
+cv_fun <- function(fold) {
+   fold_number <- fold_index()
+    index <- validation()
+  v <- origami::fold_index(fold = fold)
+  list(index = index,
+          fold_index = rep(fold_index(), length(index)), predictions=as.data.table(do.call(cbind, lapply(output[[v]] , `[[`, "LRR_pred"))))
+}
+ comb_ctrl <- list(combiners = list(
+        index = combiner_c, fold_index = combiner_c,
+        predictions = function(x) rbindlist(x, fill = TRUE)
+      ))
+cv_predictions <- origami::cross_validate(cv_fun, folds, .combine_control = comb_ctrl)
+cv_predictions <- as.matrix(cv_predictions$predictions[order(cv_predictions$index),] )
+best_learner_index_cv <- which.min(DR_risk_function_LRR(cv_predictions, A , Y, EY1, EY0, pA1, weights))
+ 
+```
+
+```{r}
+ 
+
+```
+
+
+

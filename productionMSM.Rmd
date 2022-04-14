@@ -1,0 +1,143 @@
+---
+title: "MSM"
+output: html_document
+date: '2022-03-03'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+n <- 2500
+W1 <- runif(n, -1 , 1)
+W2 <- runif(n, -1 , 1)# rbinom(n, 1 , plogis(W1))
+W <- cbind(W1, W2)
+A <- rbinom(n, 1 , plogis(0.5*(W1 + W2 )))
+Y <- rbinom(n, 1, plogis(-1 + W1 + W2 + A*(1 + W1 + W2)))
+LRR <- log(plogis(-1 + W1 + W2 + 1*(1 + W1 + W2)) / plogis(-1 + W1 + W2 + 0*(1 + W1 + W2)))
+           
+R <- as.numeric(1:n %in% c(which(Y==1), which(Y==0)[rbinom(sum(Y==0), size = 1, prob = 0.5)==1]))
+R <- rep(1,n)
+pR0 <- mean(R[Y==0])
+pR1 <- mean(R[Y==1])
+weights <- R / ifelse(Y==1, pR1, pR0)
+
+keep <- R!=0
+W <- W[keep,]
+A <- A[keep]
+Y <- Y[keep]
+weights <- weights[keep]
+LRR <- LRR[keep]
+lrnr <- make_learner(Pipeline, Lrnr_cv$new(Stack$new(Lrnr_xgboost$new(max_depth = 5), Lrnr_xgboost$new(max_depth = 4), Lrnr_xgboost$new(max_depth = 3))), Lrnr_cv_selector$new(loss_loglik_binomial))
+
+lrnr <- Lrnr_hal9001$new(max_degree = 2, smoothness_orders = 1, num_knots = c(2,1))
+likelihood <- estimate_initial_likelihood(W, A, Y, weights, lrnr, lrnr)
+lrnr <- Lrnr_glm$new(formula = ~.^2)
+EY1W <- likelihood$EY1
+EY0W <- likelihood$EY0
+pA1W <- likelihood$pA1
+
+formula_RR <- ~ 1 + W1
+coef(npRRWorkingModel(formula_RR, W, A, Y, weights, EY1W, EY0W, pA1W))
+coef(npRRWorkingModel(formula_RR, W, A, Y, weights, sl3_Learner_EYAW = lrnr, sl3_Learner_pA1W = lrnr))
+
+```
+
+
+
+```{r}
+ 
+
+pA1W <- as.vector(pA1W)
+EY0W <- as.vector(EY0W)
+EY1W <- as.vector(EY1W)
+
+n <- length(A)
+V <- model.matrix(formula_RR, as.data.frame(W))
+pA0W <- 1 - pA1W
+pAW <- ifelse(A==1, pA1W, pA0W)
+EYAW <- ifelse(A==1, EY1W, EY0W)
+
+
+
+# Compute initial EIF for variance estimation
+
+beta <- suppressWarnings(coef(glm.fit(V, EY1W, offset = log(EY0W), family = poisson(), weights = weights)))
+RR_beta <- as.vector(exp(V %*% beta))
+H <- V * (A / pA1W - (1 - A) * RR_beta * (1 / pA0W))
+
+scale <- apply(V, 2, function(v) {
+  apply(weights * V * (v) * RR_beta * EY0W, 2, mean)
+})
+scaleinv <- solve(scale)
+
+EIF_Y_initial <- weights * (H %*% scaleinv) * as.vector(Y - EYAW)
+EIF_WA_initial <- apply(V, 2, function(v) {
+  weights * (v * (RR_beta * EY0W - EY1W) - mean(weights * v * (RR_beta * EY0W - EY1W)))
+}) %*% scaleinv
+ses <- sqrt(diag(var(EIF_Y_initial + EIF_WA_initial)))
+
+max_iter <- 100
+max_eps <- 0.01
+for(i in seq_len(max_iter)) {
+  beta <- suppressWarnings(coef(glm.fit(V, EY1W, offset = log(EY0W), family = poisson(), weights = weights)))
+  RR_beta <- as.vector(exp(V %*% beta))
+  
+  H <- V * (A  - (1 - A) * RR_beta )
+  H1 <- V 
+  H0 <- - V  *  RR_beta 
+  EIF_Y <- weights/pAW * (H %*% scaleinv) * as.vector(Y - EYAW)
+  print(max(abs(colMeans(EIF_Y))))
+  if(all(abs(colMeans(EIF_Y)) <= 0.5 * ses / sqrt(n) / log(n))) {
+    print(colMeans(EIF_Y))
+    print("Converged.")
+    break
+  }
+  dir <- colMeans(EIF_Y)
+  dir <- dir / norm(dir, type = "2")
+  H_1d <- H %*% dir
+  # Log-link submodel
+  apply_sub_model <- function(pred, H, eps) {
+    return(as.vector(exp(log(pred) + H * eps)))
+  }
+  # Weighted poisson risk function
+  risk_function <- function(eps) {
+    EYAW_eps <- apply_sub_model(EYAW, H_1d, eps)
+    risk <- mean(weights/pAW * (EYAW_eps - Y * log(EYAW_eps)))
+    return(risk)
+  }
+  
+  optim_fit <- optim(par = list(epsilon = c(rep(0, ncol(V)))), fn =  risk_function, method = "Brent", lower = 0, upper = max_eps)
+  epsilon <- optim_fit$par
+  EY1W <- apply_sub_model(EY1W, H1 %*% dir , epsilon)
+  EY0W <- apply_sub_model(EY0W, H0 %*% dir , epsilon)
+  EYAW <- ifelse(A==1, EY1W, EY0W)
+  
+}
+
+tmle_scores <- max(abs(colMeans(EIF_Y)))
+beta_tmle <- suppressWarnings(coef(glm.fit(V, EY1W, offset = log(EY0W), family = poisson(), weights = weights)))
+EIF <- EIF_Y_initial + EIF_WA_initial
+Zscore <- abs(sqrt(n) * beta_tmle / ses)
+pvalue <- signif(2 * (1 - pnorm(Zscore)), 5)
+coefs <- data.frame(coef = beta_tmle, se = ses/sqrt(n), 
+           ci_left = beta - 1.96*ses/sqrt(n),  ci_right = beta + 1.96*ses/sqrt(n),
+           Z_score = Zscore, p_value = pvalue
+           )
+output <- list(coefficients = coefs, EIF = EIF, tmle_scores = tmle_scores )
+coef(output)
+```
+
+
+```{r}
+library(causalglm)
+fit <- npglm(formula_RR, data.frame(W, A, Y), W = c("W1", "W2"), A = "A", Y = "Y", estimand = "RR", sl3_Learner_A = lrnr, sl3_Learner_Y = lrnr)
+coef(fit)
+coef(output)
+
+```
+
+
+
