@@ -77,8 +77,8 @@ efficient_loss_function <- function(theta, A , Y, EY1W , EY0W , pA1W){
 
   
   
- 
-fit_npcausalML <- npcausalML(list(Lrnr_glm$new()),
+   set.seed(1022030)
+fit_npcausalML <- npcausalML(list( Lrnr_gam$new(family = binomial())),
                  W= W, A = A, Y = Y, V = W, weights = weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, outcome_type = "continuous", list_of_sieves = list_of_sieves,cross_validate = FALSE,
                  outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin, 
                  outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, 
@@ -88,13 +88,28 @@ fit_npcausalML <- npcausalML(list(Lrnr_glm$new()),
                  family_risk_function = poisson(),
                  efficient_loss_function = efficient_loss_function, use_sieve_selector =FALSE) 
 
-  set.seed(10030)
-fit_npRR <- npRR::npRR(Lrnr_glm$new(), W, A, Y, V = W, weights, Vpred = V, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, list_of_sieves = list_of_sieves, outcome_type = "continuous")
+ 
+  set.seed(1022030)
+fit_npcausalML2 <- npcausalML(list( Lrnr_gam$new(family = binomial())),
+                 W= W, A = A, Y = Y, V = W, weights = weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, outcome_type = "continuous", list_of_sieves = list_of_sieves,cross_validate = FALSE,
+                 outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin, 
+                 outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, 
+                 design_function_sieve_plugin = design_function_sieve_plugin, 
+                 weight_function_sieve_plugin = weight_function_sieve_plugin, 
+                 design_function_sieve_IPW = design_function_sieve_IPW, weight_function_sieve_IPW = weight_function_sieve_IPW, transform_function = qlogis,
+                 family_risk_function = poisson(),
+                 efficient_loss_function = efficient_loss_function, use_sieve_selector =TRUE) 
 ```
 
 ```{r}
-data.table(npcausalML::predict(fit_npcausalML, W))
-data.table(npcausalML::predict(fit_npcausalML, W),
-npRR:::predict(fit_npRR, W))
+preds <- data.table(npcausalML::predict(fit_npcausalML, W))
+apply(preds, 2, function(theta) {
+  mean((LRR - theta)^2)
+})
+
+preds <- data.table(npcausalML::predict(fit_npcausalML2, W))
+apply(preds, 2, function(theta) {
+  mean((LRR - theta)^2)
+})
 ```
  
