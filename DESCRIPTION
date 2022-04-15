@@ -1,4 +1,4 @@
-Package: npRR
+Package: npcausalML
 Type: Package
 Title: Nonparametric estimation of the relative risk function
 Version: 0.1.0

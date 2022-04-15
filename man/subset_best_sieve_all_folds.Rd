@@ -14,7 +14,7 @@ subset_best_sieve_all_folds(
   EY0W,
   pA1W,
   weights,
-  DR_loss_function
+  efficient_loss_function
 )
 }
 \arguments{

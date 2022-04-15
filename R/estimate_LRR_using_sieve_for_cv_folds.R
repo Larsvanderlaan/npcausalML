@@ -43,14 +43,14 @@ train_learners_using_fold <- function(fold, V, A, Y, EY1W, EY0W, pA1W, weights, 
 #' @param EY0W A numeric vector containing initial cross-fitted estimates of E[Y|A=0,W] for all observations.
 #' @param pA1W A numeric vector containing initial cross-fitted estimates of P(A=1|W) for all observations.
 #' @param weights A numeric vector of observation weights. If no special weighting desired, supply a vector of 1's.
-subset_best_sieve_all_folds <- function(folds, trained_learner_list, learner_names, A, Y, EY1W, EY0W, pA1W, weights, DR_loss_function) {
+subset_best_sieve_all_folds <- function(folds, trained_learner_list, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function) {
   trained_learner_list <- trained_learner_list
   output <- lapply(seq_along(folds), function(fold_number) {
     fold <- folds[[fold_number]]
     training_index <- origami::training(fold = fold)
     keep <- which(stringr::str_detect(names(trained_learner_list), paste0("^", fold_number, "\\.", "+")))
     learners <- trained_learner_list[keep]
-    learners <- subset_best_sieve(learners, learner_names, A[training_index], Y[training_index], EY1W[training_index], EY0W[training_index], pA1W[training_index], weights[training_index], DR_loss_function)
+    learners <- subset_best_sieve(learners, learner_names, A[training_index], Y[training_index], EY1W[training_index], EY0W[training_index], pA1W[training_index], weights[training_index], efficient_loss_function)
 
     return(learners)
 
@@ -67,7 +67,7 @@ cv_predict_learner <- function(folds, learners_all_folds) {
     index <- validation()
     v <- origami::fold_index(fold = fold)
     list(index = index,
-         fold_index = rep(fold_index(), length(index)), predictions=as.data.table(do.call(cbind, lapply(learners_all_folds[[v]] , `[[`, "LRR_pred"))))
+         fold_index = rep(fold_index(), length(index)), predictions=as.data.table(do.call(cbind, lapply(learners_all_folds[[v]] , `[[`, "ERM_pred"))))
   }
   comb_ctrl <- list(combiners = list(
     index = combiner_c, fold_index = combiner_c,

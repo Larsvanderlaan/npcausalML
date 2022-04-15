@@ -14,26 +14,26 @@
 #' @param Vpred A matrix of covariates observations at which to predict the LRR. By default, \code{Vpred} equals \code{W}.
 #' @param compute Whether to `compute` the list of delayed trained learners. See the package \code{delayed} for details.
 train_learner_all_sieves <- function(sl3_Learner, V, A, Y, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, list_of_sieve_nuisances, Vpred = V, compute = FALSE) {
-  list_of_sieve_LRR <- lapply(list_of_sieve_nuisances, function(sieve_nuisances) {
+  list_of_sieve <- lapply(list_of_sieve_nuisances, function(sieve_nuisances) {
     EY1W_star <- sieve_nuisances$EY1W_star
     EY0W_star <- sieve_nuisances$EY0W_star
     pA1W_star <- sieve_nuisances$pA1W_star
 
     print("MADE it")
     print(family_risk_function)
-    delayed_plugin_LRR <- delayed_fun(estimate_LRR_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin"), Vpred = W, transform_function = transform_function)
+    delayed_plugin_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin"), Vpred = W, transform_function = transform_function)
 
-    delayed_IPW_LRR <- delayed_fun(estimate_LRR_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("IPW"), Vpred = W, transform_function = transform_function)
+    delayed_IPW_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("IPW"), Vpred = W, transform_function = transform_function)
 
-    output <- (list( plugin = delayed_plugin_LRR, IPW = delayed_IPW_LRR))
+    output <- (list( plugin = delayed_plugin_ERM, IPW = delayed_IPW_ERM))
   })
   sieve_names <- sapply(list_of_sieve_nuisances, `[[`, "sieve")
-  names(list_of_sieve_LRR) <- sieve_names
+  names(list_of_sieve) <- sieve_names
   if(compute) {
-    list_of_sieve_LRR <- bundle_delayed(unlist(list_of_sieve_LRR))
-    list_of_sieve_LRR <- list_of_sieve_LRR$compute()
+    list_of_sieve <- bundle_delayed(unlist(list_of_sieve))
+    list_of_sieve <- list_of_sieve$compute()
   }
-  return(list_of_sieve_LRR)
+  return(list_of_sieve)
 }
 
 #' Train the LRR learners for all sieves and base learners on the full data.
@@ -73,7 +73,7 @@ train_learners <- function(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_funct
 #' @param EY0W A numeric vector containing initial cross-fitted estimates of E[Y|A=0,W] for all observations.
 #' @param pA1W A numeric vector containing initial cross-fitted estimates of P(A=1|W) for all observations.
 #' @param weights A numeric vector of observation weights. If no special weighting desired, supply a vector of 1's.
-subset_best_sieve <- function(trained_learner_list, learner_names, A, Y, EY1W, EY0W, pA1W, weights, DR_loss_function) {
+subset_best_sieve <- function(trained_learner_list, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function) {
   learners <- trained_learner_list
 
 
@@ -83,51 +83,51 @@ subset_best_sieve <- function(trained_learner_list, learner_names, A, Y, EY1W, E
 
     # Get LRR predictions on fold-specific training set for all sieves
     # Single learner
-    all_LRR_training <- lapply(sieve_learners, `[[`, "LRR_train")
+    all_ERM_training <- lapply(sieve_learners, `[[`, "ERM_train")
 
-    ntrain <- nrow(all_LRR_training[[1]])
-    tmp <- do.call(rbind, all_LRR_training)
-    list_of_sieve_LRR_training <- lapply(seq_len(ncol(tmp)), function(j) {
+    ntrain <- nrow(all_ERM_training[[1]])
+    tmp <- do.call(rbind, all_ERM_training)
+    list_of_sieve_training <- lapply(seq_len(ncol(tmp)), function(j) {
       matrix(tmp[,j], nrow = ntrain, byrow = F)
     })
 
-    all_LRR_pred <- lapply(sieve_learners, `[[`, "LRR_pred")
-    npred <- nrow(all_LRR_pred[[1]])
-    tmp <- do.call(rbind, all_LRR_pred)
-    list_of_sieve_LRR_pred <- lapply(seq_len(ncol(tmp)), function(j) {
+    all_ERM_pred <- lapply(sieve_learners, `[[`, "ERM_pred")
+    npred <- nrow(all_ERM_pred[[1]])
+    tmp <- do.call(rbind, all_ERM_pred)
+    list_of_sieve_pred <- lapply(seq_len(ncol(tmp)), function(j) {
       matrix(tmp[,j], nrow = npred, byrow = F)
     })
 
-    all_best_index <- rep(NA, length(list_of_sieve_LRR_training))
-    all_best_LRR_training <- as.list( rep(NA, length(list_of_sieve_LRR_training)))
-    all_best_LRR_pred <- as.list( rep(NA, length(list_of_sieve_LRR_training)))
+    all_best_index <- rep(NA, length(list_of_sieve_training))
+    all_best_ERM_training <- as.list( rep(NA, length(list_of_sieve_training)))
+    all_best_ERM_pred <- as.list( rep(NA, length(list_of_sieve_training)))
 
 
 
-    lapply(seq_along(list_of_sieve_LRR_training), function(j) {
-      sieve_LRR_training <- list_of_sieve_LRR_training[[j]]
-      print(dim(sieve_LRR_training))
-      all_training_risks <-  DR_risk_function_LRR(sieve_LRR_training, A, Y, EY1W, EY0W, pA1W, weights, DR_loss_function = DR_loss_function)
+    lapply(seq_along(list_of_sieve_training), function(j) {
+      sieve_ERM_training <- list_of_sieve_training[[j]]
+      print(dim(sieve_ERM_training))
+      all_training_risks <-  efficient_risk_function(sieve_ERM_training, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function = efficient_loss_function)
 
 
       best_index <- which.min(all_training_risks)
-      all_best_LRR_training[[j]] <<- sieve_LRR_training[,best_index]
+      all_best_ERM_training[[j]] <<- sieve_ERM_training[,best_index]
 
-      all_best_LRR_pred[[j]] <<- list_of_sieve_LRR_pred[[j]][,best_index]
+      all_best_ERM_pred[[j]] <<- list_of_sieve_pred[[j]][,best_index]
       all_best_index[j] <<-  best_index
       return(NULL)
     })
 
-    all_best_LRR_training <- do.call(cbind, all_best_LRR_training)
-    colnames(all_best_LRR_training) <- colnames(all_LRR_training[[1]])
+    all_best_ERM_training <- do.call(cbind, all_best_ERM_training)
+    colnames(all_best_ERM_training) <- colnames(all_ERM_training[[1]])
 
-    all_best_LRR_pred <- do.call(cbind, all_best_LRR_pred)
-    colnames(all_best_LRR_pred) <- colnames(all_LRR_pred[[1]])
+    all_best_ERM_pred <- do.call(cbind, all_best_ERM_pred)
+    colnames(all_best_ERM_pred) <- colnames(all_ERM_pred[[1]])
 
     best_sieve_learners <- lapply(all_best_index, function(best_index) {
-      sieve_learners[[best_index]]$learner
+      sieve_learners[[best_index]]$ERM_learner
     })
-    return(list(LRR_train = all_best_LRR_training, LRR_pred = all_best_LRR_pred, learners = best_sieve_learners))
+    return(list(ERM_train = all_best_ERM_training, ERM_pred = all_best_ERM_pred, ERM_learner = best_sieve_learners))
 
 
   })
