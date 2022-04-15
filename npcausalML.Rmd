@@ -78,7 +78,7 @@ efficient_loss_function <- function(theta, A , Y, EY1W , EY0W , pA1W){
   
   
    set.seed(1022030)
-fit_npcausalML <- npcausalML(list( Lrnr_gam$new(family = binomial())),
+fit_npcausalML <- npcausalML(list( Lrnr_hal9001$new(max_degree = 1, smoothness_orders = 1, num_knots = 10, family = binomial())),
                  W= W, A = A, Y = Y, V = W, weights = weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, outcome_type = "continuous", list_of_sieves = list_of_sieves,cross_validate = FALSE,
                  outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin, 
                  outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, 

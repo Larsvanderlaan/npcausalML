@@ -39,12 +39,15 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
     if(task_ERM$outcome_type$type %in% c("constant", "categorical")) {
       task_ERM <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights", outcome_type = "continuous")
     }
+
   }
   else if(learning_method == "IPW") {
     pseudo_outcome <- outcome_function_IPW(A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
     pseudo_weights <- weights * weight_function_IPW(A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
     data$pseudo_outcome <- pseudo_outcome
     data$pseudo_weights <- pseudo_weights
+    print(data)
+
     params <- sl3_Learner$params
     params$family <- family_risk_function
     sl3_Learner <- sl3_Learner$clone()$reparameterize(params)
@@ -52,12 +55,12 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
     if(task_ERM$outcome_type$type %in% c("constant", "categorical")) {
       task_ERM <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights", outcome_type = "continuous")
     }
+
   }
-  print(learning_method)
-  print(data.table(task_ERM$Y))
+
   task_ERM_pred <- sl3_Task$new(as.data.table(Vpred), covariates = covariates)
 
-  sl3_Learner_trained <- sl3_Learner$train(task_ERM)
+  sl3_Learner_trained <- sl3_Learner$train(task_ERM[task_ERM$weights!=0])
   ERM <- sl3_Learner_trained$predict(task_ERM)
   ERM_pred <- sl3_Learner_trained$predict(task_ERM_pred)
   if(!is.null(transform_function)) {
