@@ -1,6 +1,7 @@
 
 #' @export
-npcausalML <- function(learners, W, A, Y, V = W, weights, Vpred = V, EY1W, EY0W, pA1W, sl3_Learner_EYAW, sl3_Learner_pA1W, outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, outcome_type = c("binomial", "continuous", "nonnegative"), family_risk_function, family_for_targeting, transform_function, efficient_loss_function, list_of_sieves, cross_validate_ERM = FALSE, use_sieve_selector = TRUE, folds = origami::make_folds(n=length(A))) {
+npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vpred = V, EY1W, EY0W, pA1W, sl3_Learner_EYAW, sl3_Learner_pA1W, outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, outcome_type = c("binomial", "continuous", "nonnegative"), family_risk_function, family_for_targeting, transform_function, efficient_loss_function, list_of_sieves, cross_validate_ERM = FALSE, use_sieve_selector = TRUE, folds = origami::make_folds(n=length(A))) {
+
   if(!is.list(learners)) {
     learners <- list(learners)
   }
@@ -49,7 +50,7 @@ npcausalML <- function(learners, W, A, Y, V = W, weights, Vpred = V, EY1W, EY0W,
     all_ERM_full_best <- full_fit_ERM
   }
    all_ERM_full_predictions <- do.call(cbind, lapply(all_ERM_full_best, `[[`, "ERM_pred"))
-  output_list <- list(learners = all_ERM_full_best)
+  output_list <- list(learners = all_ERM_full_best, pA1W = pA1W, EY1W = EY1W, EY0W = EY0W)
   if(cross_validate_ERM) {
     if(use_sieve_selector) {
       print("use_sieve_selector is overwritten to TRUE when cross_validate_ERM = TRUE")
@@ -107,4 +108,4 @@ predict <- function(output, Wpred) {
 }
 
 
-fit_npcausalML
+

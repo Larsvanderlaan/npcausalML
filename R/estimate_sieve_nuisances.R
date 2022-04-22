@@ -24,7 +24,7 @@ compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, we
   } else if(all(Y >=0)) {
     family_for_targeting <- poisson()
   } else {
-    stop("The outcome `Y` must be nonnegative")
+    family_for_targeting <- gaussian()
   }
   if(is.null(basis_generator)) {
     return(list(pA1W_star = pA1W, EY1W_star = EY1W, EY0W_star = EY0W, sieve = "no_sieve"))

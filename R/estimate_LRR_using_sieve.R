@@ -18,12 +18,11 @@ train_learner_all_sieves <- function(sl3_Learner, V, A, Y, weights, family_risk_
     EY1W_star <- sieve_nuisances$EY1W_star
     EY0W_star <- sieve_nuisances$EY0W_star
     pA1W_star <- sieve_nuisances$pA1W_star
+    #print(data.table(sieve = EY1W_star))
 
-    print("MADE it")
-    print(family_risk_function)
-    delayed_plugin_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin"), Vpred = W, transform_function = transform_function)
+    delayed_plugin_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin"), Vpred = Vpred, transform_function = transform_function)
 
-    delayed_IPW_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("IPW"), Vpred = W, transform_function = transform_function)
+    delayed_IPW_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("IPW"), Vpred = Vpred, transform_function = transform_function)
 
     output <- (list( plugin = delayed_plugin_ERM, IPW = delayed_IPW_ERM))
   })
@@ -51,7 +50,7 @@ train_learner_all_sieves <- function(sl3_Learner, V, A, Y, weights, family_risk_
 #' @param compute Whether to `compute` the list of delayed trained learners. See the package \code{delayed} for details.
 train_learners <- function(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = V, compute = TRUE) {
     print("train_learners")
-  print(design_function_sieve_plugin)
+
   list_of_sieve_nuisances <- lapply(list_of_sieves, function(sieve){
     compute_plugin_and_IPW_sieve_nuisances(basis_generator = sieve, V = V, A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W, weights = weights, design_function_sieve_plugin = design_function_sieve_plugin, weight_function_sieve_plugin = weight_function_sieve_plugin, design_function_sieve_IPW = design_function_sieve_IPW, weight_function_sieve_IPW = weight_function_sieve_IPW, family_for_targeting = family_for_targeting)})
   all_learners_delayed <- lapply(list_of_learners, train_learner_all_sieves, list_of_sieve_nuisances = list_of_sieve_nuisances, V = V, A = A, Y = Y, weights = weights, family_risk_function = family_risk_function, outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin,  outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, transform_function = transform_function, Vpred = Vpred)

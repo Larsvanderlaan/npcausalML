@@ -8,6 +8,175 @@ date: '2022-04-13'
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# First plots
+
+
+```{r}
+simpleparametric(100, Stack$new(Lrnr_glm$new(), Lrnr_earth$new()))
+
+
+```
+
+
+```{r}
+library(sl3)
+n <- 500
+W1 <- runif(n, -1 , 1)
+W2 <- runif(n, -1 , 1)# rbinom(n, 1 , plogis(W1))
+W <- cbind(W1, W2)
+A <- rbinom(n, 1 , plogis(2*(W1 + W2 )))
+Y <- rnorm(n, W1 + W2 + A*(1 + W1 + W2), 1)
+CATE <- (1 + W1 + W2)
+quantile(plogis(2*(W1 + W2 )))
+data <- data.table(W1,W2,A,Y)
+
+task_A <- sl3_Task$new(data, covariates = c("W1", "W2"), outcome = "A")
+task_Y <- sl3_Task$new(data, covariates = c("W1", "W2", "A"), outcome = "Y")
+data1 <- data
+data1$A <- 1
+task_Y1 <- sl3_Task$new(data, covariates = c("W1", "W2", "A"), outcome = "Y")
+data0 <- data
+data0$A <- 0
+task_Y0 <- sl3_Task$new(data, covariates = c("W1", "W2", "A"), outcome = "Y")
+lrnr_Y <- Lrnr_cv$new(Lrnr_earth$new())
+lrnr_A <- Lrnr_cv$new(Lrnr_earth$new())
+lrnr_Y <- lrnr_Y$train(task_Y)
+lrnr_A <- lrnr_A$train(task_A)
+pA1 <- lrnr_A$predict(task_A)
+EY1 <- lrnr_Y$predict(task_Y1)
+EY0 <- lrnr_Y$predict(task_Y0)
+EY <- ifelse(A==1, EY1, EY0)
+pA1 <- pmax(pmin(pA1, 0.98), 0.02)
+pA0 <- 1- pA1
+Ytilde <- EY1 - EY0 + (A/pA1 - (1-A)/pA0)*(Y - EY)
+quantile(Ytilde)
+beta <- coef(glm(Y~X.W1 + X.W2 - 1, data= data.frame(Y = Y, X = (A - (1-A))*W), offset = EY, weights = ifelse(A==1, 1/pA1, 1/pA0)))
+
+EY1Star <- EY1 +(1 - (1-1))*W %*% beta 
+EY0Star <- EY0 +(0 - (1-0))*W %*% beta 
+Ytilde_star =  EY1Star - EY0Star
+data <- data.frame(W1, W2, Ytilde = Ytilde, Ytilde_star =  EY1Star - EY0Star)
+task_onestep <- sl3_Task$new(data, covariates = c("W1", "W2"), outcome = "Ytilde")
+task_plugin <- sl3_Task$new(data, covariates = c("W1", "W2"), outcome = "Ytilde_star")
+
+lrnr <- Lrnr_glm$new()
+lrnr_1 <- lrnr$train(task_onestep)
+CATEonestep <- lrnr_1$predict(task_onestep)
+
+lrnr_1 <- lrnr$train(task_plugin)
+CATEplugin <- lrnr_1$predict(task_plugin)
+plot(CATE, Ytilde)
+plot(CATE, Ytilde_star)
+plot(CATE, CATEonestep)
+plot(CATE, CATEplugin)
+mean((CATE - CATEonestep)^2)
+mean((CATE - CATEplugin)^2)
+```
+
+
+# CATE 
+```{r}
+n <- 25000
+  W1 <- runif(n, -1 , 1)
+  W2 <- runif(n, -1 , 1)# rbinom(n, 1 , plogis(W1))
+  W <- cbind(W1, W2)
+  A <- rbinom(n, 1 , plogis(0.5*(W1 + W2 )))
+  Y <- rnorm(n, W1 + W2 + A*(1 + W1 + W2), 1.5)
+  quantile(Y)
+  CATE <-(1 + W1 + W2)
+  true_coefs <- c(1, 1, 1)
+  R <- as.numeric(1:n %in% c(which(Y>0), which(Y<0)[rbinom(sum(Y<0), size = 1, prob = 0.5)==1]))
+  R <- rep(1,n)
+  pR0 <- mean(R[Y<0])
+  pR1 <- mean(R[Y>0])
+  weights <- R / ifelse(Y>0, pR1, pR0)
+  
+  
+  sl3_Learner_EYAW <- Lrnr_hal9001$new(family = "gaussian", smoothness_orders =1, num_knots = c(10,5), max_degree = 2)
+  sl3_Learner_pA1W <- Lrnr_gam$new()
+  
+  sl3_Learner_EYAW <- Lrnr_xgboost$new(max_depth = 5)
+  #sl3_Learner_pA1W <-Lrnr_xgboost$new(max_depth = 5)
+  
+  list_of_sieves <- list_of_sieves <- list(
+        NULL,
+        fourier_basis$new(orders = c(1,0)),
+        fourier_basis$new(orders = c(2,0)),
+        fourier_basis$new(orders = c(1,1))
+      )
+  
+  outcome_function_plugin <- function(A, Y, EY1W, EY0W, pA1W) {
+    EY1W - EY0W
+  }
+  weight_function_plugin <- function(A, Y, EY1W, EY0W, pA1W) {
+     rep(1, length(A))
+  }
+  outcome_function_IPW <- function(A, Y, EY1W, EY0W, pA1W) {
+    pA0W <- 1- pA1W
+    Y * (A/pA1W - (1-A)/(pA0W))
+  }
+  weight_function_IPW <- function(A, Y, EY1W, EY0W, pA1W) {
+     #pA <- ifelse(A==1, pA1W, 1 - pA1W)
+     #1 / pA
+     return(rep(1,length(A)))
+  }
+  
+design_function_sieve_plugin <- function(X,A , Y, EY1W , EY0W , pA1W ) {
+    cbind(A*X, (1-A)*X)
+  }
+design_function_sieve_IPW <- function(X,A , Y, EY1W , EY0W , pA1W ){
+    pA0W <- 1-pA1W
+    cbind(EY1W/pA1W * X, X* EY0W/pA0W) 
+}
+weight_function_sieve_plugin <- function(A , Y, EY1W , EY0W , pA1W ){
+     1/ifelse(A==1,pA1W, 1- pA1W)
+} 
+weight_function_sieve_IPW <- function(A , Y, EY1W , EY0W , pA1W ){
+     return(rep(1,length(A)))
+} 
+
+efficient_loss_function <- function(theta, A , Y, EY1W , EY0W , pA1W){
+  pA <-  1/ifelse(A==1,pA1W, 1- pA1W)
+  EY <- ifelse(A==1, EY1W, EY0W)
+  loss <- theta^2 - 2 * theta * (CATE + (1/pA)*(Y - EY))
+  return(loss)
+}
+
+  
+  
+   set.seed(1022030)
+fit_npcausalML <- npcausalML(list( Lrnr_glm$new()),
+                 W= W, A = A, Y = Y, V = W, weights = weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, outcome_type = "continuous", list_of_sieves = list_of_sieves,cross_validate = FALSE,
+                 outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin, 
+                 outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, 
+                 design_function_sieve_plugin = design_function_sieve_plugin, 
+                 weight_function_sieve_plugin = weight_function_sieve_plugin, 
+                 design_function_sieve_IPW = design_function_sieve_IPW, weight_function_sieve_IPW = weight_function_sieve_IPW, transform_function = function(x){x},
+                 family_risk_function = gaussian(),
+                 efficient_loss_function = efficient_loss_function, use_sieve_selector =FALSE) 
+
+preds <- predict(fit_npcausalML, W)
+```
+
+
+```{r}
+ 
+apply(preds, 2, function(p) {
+  mean((p - CATE)^2)
+})
+apply(preds, 2, function(p) {
+  cor(p ,CATE)
+})
+as.data.table(preds)
+plot(preds[,1], CATE)
+plot(preds[,2], CATE)
+```
+
+
+
+
+# LRR 
+
 
 
 ```{r}
@@ -73,6 +242,7 @@ efficient_loss_function <- function(theta, A , Y, EY1W , EY0W , pA1W){
   EY <- ifelse(A==1, EY1W, EY0W)
   plugin_risk <- (EY0W + EY1W) * log(1 + exp(LRR)) - EY1W * LRR
   score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR)) - LRR)*(Y - EY)
+  plugin_risk + score_comp
 }
 
   
@@ -90,7 +260,7 @@ fit_npcausalML <- npcausalML(list( Lrnr_hal9001$new(max_degree = 1, smoothness_o
 
  
   set.seed(1022030)
-fit_npcausalML2 <- npcausalML(list( Lrnr_gam$new(family = binomial())),
+fit_npcausalML2 <- npcausalML(list( Lrnr_hal9001$new(max_degree = 1, smoothness_orders = 1, num_knots = 10, family = binomial())),
                  W= W, A = A, Y = Y, V = W, weights = weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, outcome_type = "continuous", list_of_sieves = list_of_sieves,cross_validate = FALSE,
                  outcome_function_plugin = outcome_function_plugin, weight_function_plugin = weight_function_plugin, 
                  outcome_function_IPW = outcome_function_IPW, weight_function_IPW = weight_function_IPW, 
@@ -111,5 +281,6 @@ preds <- data.table(npcausalML::predict(fit_npcausalML2, W))
 apply(preds, 2, function(theta) {
   mean((LRR - theta)^2)
 })
+plot(preds$Lrnr_hal9001_1_1_10_, LRR)
 ```
  

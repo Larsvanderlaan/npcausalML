@@ -31,9 +31,10 @@ estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1
   EY <- sl3_Learner_EYAW_trained$predict(task_EY)
   EY1W <- sl3_Learner_EYAW_trained$predict(task_EY1W)
   EY0W <- sl3_Learner_EYAW_trained$predict(task_EY0W)
-  if(any(c(EY,EY1W,EY0W ) <0) ){
-    stop("Negative values detected in estimated initial predictions of the conditional mean E[Y | A, W]. The predictions should be nonnegative.")
-  }
+  #print(data.table(EY, EY1W, EY0W))
+  #if(any(c(EY,EY1W,EY0W ) <0) ){
+   # stop("Negative values detected in estimated initial predictions of the conditional mean E[Y | A, W]. The predictions should be nonnegative.")
+  #}
   pA1W <- sl3_Learner_pA1W_trained$predict(task_pA1W)
   if(any(EY != ifelse(A==1, EY1W, EY0W))) {
     stop("EY and EY1W, EY0W are inconsistent.")
