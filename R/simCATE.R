@@ -89,7 +89,7 @@ list_of_sieves_uni <- list_of_sieves <- list(
   fourier_basis$new(orders = c(5,0))
 )
 
-out <- estCATE(250,  lrnr_stack, 1, sim.CATE, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
+#out <- estCATE(250,  lrnr_stack, 1, sim.CATE, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
 
 
 estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
@@ -102,6 +102,7 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
   list_catesubst <- list()
   list_causalforest <- list()
   for(i in 1:nsims) {
+    print(i)
     data <- sim_function(n, ...)
     W <- data$W
     W <- as.matrix(data.frame(W = W))
@@ -146,6 +147,8 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
                                  efficient_loss_function = efficient_loss_function_CATE, use_sieve_selector = TRUE)
 
     preds <- predict(fit_npcausalML, W)
+    print("HERE")
+    print(dim(preds))
     EY1W_est <- fit_npcausalML$EY1W
     EY0W_est <- fit_npcausalML$EY0W
     pA1W_est <- fit_npcausalML$pA1W
@@ -170,6 +173,7 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
     })
 
 
+
     risk_subst<-  mean((CATE - (EY1W_est  - EY0W_est))^2)
 
     Y.hat <- EY1W_est * pA1W_est + EY0W_est * (1-pA1W_est)
@@ -177,6 +181,7 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
     fit <- grf::causal_forest(X = W, Y  = Y, W = A, Y.hat = Y.hat, W.hat = W.hat)
     preds_cf <-  fit$predictions
     risk_cf <- mean((CATE - preds_cf)^2)
+
     list_causalforest[[i]] <- risk_cf
     list_cateonestep[[i]] <- risks_onestep
     list_cateonestep_oracle[[i]] <- risks_onestep_oracle
@@ -184,11 +189,12 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
     list_catesubst[[i]] <- risk_subst
   }
   cateonestep <- rowMeans(do.call(cbind, list_cateonestep))
+  cateonestep_oracle <- rowMeans(do.call(cbind, list_cateonestep_oracle))
   cateplugin <- rowMeans(do.call(cbind, list_cateplugin))
-  subst <- mean(unlist(list_subst))
-  initial <- mean(unlist(list_initial))
-  print(initial)
-  return(data.table(initial = initial, subst = subst, cateonestep, cateplugin, lrnr = names(cateplugin)))
+  causalforest <- rowMeans(do.call(cbind, list_causalforest))
+  subst <- mean(unlist(list_catesubst))
+
+  return(data.table(subst, causalforest,  cateonestep_oracle, cateonestep, cateplugin, lrnr = names(cateplugin)))
 
 
 

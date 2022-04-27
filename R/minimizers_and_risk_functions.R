@@ -22,7 +22,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
 
   learning_method <- match.arg(learning_method)
   data <- as.data.table(V)
-  print(data.table(pA1W))
+
   covariates <- colnames(data)
   if(learning_method == "plugin") {
 
@@ -47,7 +47,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
     pseudo_weights <- weights * weight_function_IPW(A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
     data$pseudo_outcome <- pseudo_outcome
     data$pseudo_weights <- pseudo_weights
-    print(data)
+
 
     params <- sl3_Learner$params
     params$family <- family_risk_function

@@ -1,7 +1,7 @@
 
 #' @export
-npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vpred = V, EY1W, EY0W, pA1W, sl3_Learner_EYAW, sl3_Learner_pA1W, outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, outcome_type = c("binomial", "continuous", "nonnegative"), family_risk_function, family_for_targeting, transform_function, efficient_loss_function, list_of_sieves, cross_validate_ERM = FALSE, use_sieve_selector = TRUE, folds = origami::make_folds(n=length(A))) {
-
+npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vpred = V, EY1W, EY0W, pA1W, sl3_Learner_EYAW, sl3_Learner_pA1W, outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, outcome_type = c("binomial", "continuous", "nonnegative"), family_risk_function, transform_function, efficient_loss_function, list_of_sieves, cross_validate_ERM = FALSE, use_sieve_selector = TRUE, folds = origami::make_folds(n=length(A))) {
+  family_for_targeting <- binomial()
   if(!is.list(learners)) {
     learners <- list(learners)
   }
@@ -64,9 +64,9 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
     learners_all_folds <- learners_all_folds_delayed$compute()
     learners_best_sieve_all_folds <- subset_best_sieve_all_folds(folds, learners_all_folds, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function = efficient_loss_function)
     cv_predictions <- cv_predict_learner(folds, learners_best_sieve_all_folds)
-    print(data.table(cv_predictions))
+
     best_learner_index_cv <- which.min(efficient_risk_function(cv_predictions, A , Y, EY1W, EY0W, pA1W, weights, efficient_loss_function))
-    print(dim(cv_predictions))
+
     all_ERM_full_predictions <- all_ERM_full_predictions[,best_learner_index_cv]
     output_list$cv_index <- best_learner_index_cv
   }

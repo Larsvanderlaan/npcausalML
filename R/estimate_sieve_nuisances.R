@@ -42,20 +42,50 @@ compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, we
   EY <- ifelse(A==1, EY1W, EY0W)
   #pA0 <- 1 - pA1W
   #pA <- ifelse(A==1, pA1W, pA0)
-  suppressWarnings(sieve_fit_plugin <- glm.fit(X_pseudo_plugin, Y, weights = weights_pseudo_plugin, offset = family_for_targeting$linkfun(EY), family = family_for_targeting, intercept = F))
+  #print("plugin")
+
+  upper_bound <- max(c(Y, EY1W, EY0W))
+  lower_bound <- min(c(Y, EY1W, EY0W))
+  lower_bound <- min(0.9 * lower_bound, 1.1 * lower_bound)
+  upper_bound <- max(0.9 * upper_bound, 1.1 * upper_bound)
+
+  Y_scaled <- (Y - lower_bound) / (upper_bound - lower_bound)
+  EY1W_scaled <- (EY1W - lower_bound) / (upper_bound - lower_bound)
+  EY0W_scaled <- (EY0W - lower_bound) / (upper_bound - lower_bound)
+  EY_scaled <- (EY - lower_bound) / (upper_bound - lower_bound)
+  print("SCALED")
+  # print(quantile(EY_scaled))
+  # print(quantile(EY0W_scaled))
+  # print(quantile(EY1W_scaled))
+  # print(quantile(Y_scaled))
+  # print(any(is.na(Y_scaled) | is.infinite(Y_scaled)))
+  # print(any(is.na(X_pseudo_plugin) | is.infinite(X_pseudo_plugin)))
+  # print(any(is.na(weights_pseudo_plugin) | is.infinite(weights_pseudo_plugin)))
+  # print(any(is.na(qlogis(EY_scaled)) | is.infinite(qlogis(EY_scaled))))
+
+  suppressWarnings(sieve_fit_plugin <- glm.fit(X_pseudo_plugin, Y_scaled, weights = weights_pseudo_plugin, offset = qlogis(EY_scaled), family = binomial(), intercept = F))
+
   beta_plugin <- coef(sieve_fit_plugin)
   beta_plugin[is.na(beta_plugin)] <- 0
-  #beta1_plugin <- beta_plugin[1:ncol(X)]
-  #beta0_plugin <- beta_plugin[-(1:ncol(X))]
 
 
-  EY1W_star <- as.vector(family_for_targeting$linkinv(family_for_targeting$linkfun(EY1W) + X1_pseudo_plugin %*% beta_plugin))
-  EY0W_star <- as.vector(family_for_targeting$linkinv(family_for_targeting$linkfun(EY0W) + X0_pseudo_plugin %*% beta_plugin))
+  EY1W_star <- lower_bound + (upper_bound - lower_bound) * as.vector(plogis(qlogis(EY1W_scaled) + X1_pseudo_plugin %*% beta_plugin))
+  EY0W_star <- lower_bound + (upper_bound - lower_bound) * as.vector(plogis(qlogis(EY0W_scaled) + X0_pseudo_plugin %*% beta_plugin))
+  #print("sieve")
+
+  # print(quantile(EY1W_star))
+  # print(quantile(EY0W_star))
+  # print( range ((upper_bound - lower_bound) * as.vector(plogis(qlogis(EY1W_scaled) + X1_pseudo_plugin %*% beta_plugin))))
+  #
+  #   print(c(lower_bound, upper_bound))
+  #print(quantile(as.vector(plogis(qlogis(EY1W_scaled) + X1_pseudo_plugin %*% beta_plugin))))
+  #print(quantile(as.vector(plogis(qlogis(EY0W_scaled) + X0_pseudo_plugin %*% beta_plugin))))
 
   if(debug) {
     EYstar <- ifelse(A==1, EY1W_star, EY0W_star )
     print("Sieve scores plugin")
-    print(colMeans(weights_pseudo_plugin*X_pseudo_plugin*(Y - EYstar)))
+    print(quantile(abs(colMeans(weights_pseudo_plugin*X_pseudo_plugin*(Y_scaled - as.vector(plogis(qlogis(EY_scaled) + X_pseudo_plugin %*% beta_plugin)))))))
+
   }
 
   #X_IPW <- cbind(EY1W/pA1W * X, EY0W/pA0 * X)
@@ -66,6 +96,7 @@ compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, we
   beta_IPW <- coef(sieve_fit_IPW)
   beta_IPW[is.na(beta_IPW)] <- 0
   pA1W_star <- as.vector(plogis(qlogis(pA1W) + X_pseudo_IPW %*% beta_IPW))
+  pA1W_star <- pmax(pmin(pA1W_star, 0.995), 0.005)
   if(debug) {
     print("Sieve scores IPW")
     print(colMeans(weights_pseudo_IPW*X_pseudo_IPW*(A - pA1W_star)))

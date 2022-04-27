@@ -1,0 +1,68 @@
+---
+title: "Untitled"
+output: html_document
+date: '2022-04-24'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+out <- estCATE(500,  lrnr_stack, 20, sim.CATE, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
+
+
+
+```
+
+
+
+```{r}
+library(future)
+plan(multicore)
+ns <- c(100, 250, 500, 750, 1000, 5000, 10000)
+
+output <- lapply(ns, function(n) {
+  out <- estCATE(n,  lrnr_stack, 100, sim.CATE, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
+  out$n <- n
+  out
+})
+output <- do.call(rbind, output)
+write.csv("CATEsims_posFALSEhardFALSE.csv")
+
+
+
+
+ 
+
+
+```
+
+
+```{r}
+
+ 
+
+
+library(future)
+plan(multicore)
+ns <- c(250, 500, 750, 1000, 5000, 10000)
+
+output <- lapply(ns, function(n) {
+  out <- estRR(n,  lrnr_stack_LRR, 100, sim.RR, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
+  out$n <- n
+  out
+})
+output <- do.call(rbind, output)
+write.csv("RRsims_posFALSEhardFALSE.csv")
+
+
+
+
+ 
+
+
+```
+

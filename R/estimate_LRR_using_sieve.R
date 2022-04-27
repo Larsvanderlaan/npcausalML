@@ -21,7 +21,8 @@ train_learner_all_sieves <- function(sl3_Learner, V, A, Y, weights, family_risk_
     #print(data.table(sieve = EY1W_star))
 
     delayed_plugin_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin"), Vpred = Vpred, transform_function = transform_function)
-
+    #print(sl3_Learner$name)
+    #delayed_plugin_ERM$compute()
     delayed_IPW_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("IPW"), Vpred = Vpred, transform_function = transform_function)
 
     output <- (list( plugin = delayed_plugin_ERM, IPW = delayed_IPW_ERM))
@@ -58,7 +59,7 @@ train_learners <- function(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_funct
   names(all_learners_delayed) <- paste0(learner_names)
   if(compute) {
     all_learners_delayed <- bundle_delayed(unlist(all_learners_delayed))
-    all_learners_delayed <- all_learners_delayed$compute()
+    suppressWarnings(suppressMessages(all_learners_delayed <- all_learners_delayed$compute()))
   }
   return(all_learners_delayed)
 }
@@ -105,7 +106,7 @@ subset_best_sieve <- function(trained_learner_list, learner_names, A, Y, EY1W, E
 
     lapply(seq_along(list_of_sieve_training), function(j) {
       sieve_ERM_training <- list_of_sieve_training[[j]]
-      print(dim(sieve_ERM_training))
+
       all_training_risks <-  efficient_risk_function(sieve_ERM_training, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function = efficient_loss_function)
 
 
