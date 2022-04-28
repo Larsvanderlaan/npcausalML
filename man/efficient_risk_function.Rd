@@ -15,7 +15,9 @@ efficient_risk_function(
   weights,
   efficient_loss_function,
   debug = FALSE,
-  return_loss = FALSE
+  return_loss = FALSE,
+  V = NULL,
+  oracle = FALSE
 )
 }
 \arguments{

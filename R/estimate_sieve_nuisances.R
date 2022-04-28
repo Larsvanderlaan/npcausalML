@@ -18,7 +18,7 @@
 #' `family` should be a \code{binomial} object if `Y` is binary and a \code{poisson} object if `Y` is non-binary and nonnegative (e.g. a count).
 #' @param debug ...
 compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, weights, basis_generator, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting = binomial(), debug = FALSE) {
-  print("compute_plugin_and_IPW_sieve_nuisances")
+  #print("compute_plugin_and_IPW_sieve_nuisances")
   if(all(Y %in% c(0,1))) {
     family_for_targeting <- binomial()
   } else if(all(Y >=0)) {
@@ -31,6 +31,7 @@ compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, we
   }
   # Compute sieve-transformed design matrix
   basis_generator <- basis_generator$clone()
+
   X <- basis_generator$set(V)$eval(V)
   # Compute data-adaptive sieve
   X_pseudo_plugin <- design_function_sieve_plugin(X,A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
@@ -53,7 +54,7 @@ compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, we
   EY1W_scaled <- (EY1W - lower_bound) / (upper_bound - lower_bound)
   EY0W_scaled <- (EY0W - lower_bound) / (upper_bound - lower_bound)
   EY_scaled <- (EY - lower_bound) / (upper_bound - lower_bound)
-  print("SCALED")
+
   # print(quantile(EY_scaled))
   # print(quantile(EY0W_scaled))
   # print(quantile(EY1W_scaled))

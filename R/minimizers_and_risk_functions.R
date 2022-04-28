@@ -41,6 +41,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
     }
 
 
+
   }
   else if(learning_method == "IPW") {
     pseudo_outcome <- outcome_function_IPW(A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
@@ -59,7 +60,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
 
   }
 
-  task_ERM_pred <- sl3_Task$new(as.data.table(Vpred), covariates = covariates)
+  task_ERM_pred <- sl3_Task$new(as.data.table(Vpred), covariates = covariates, outcome = c())
 
   sl3_Learner_trained <- sl3_Learner$train(task_ERM[task_ERM$weights!=0])
   ERM <- sl3_Learner_trained$predict(task_ERM)
@@ -85,7 +86,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
 #' @param weights A numeric vector of observation weights. If no special weighting desired, supply a vector of 1's.
 #' @param debug ...
 #' @param return_loss Boolean for whether to return loss function values or the risk value (i.e. average of the losses)
-efficient_risk_function <- function(theta, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function, debug = FALSE, return_loss = FALSE) {
+efficient_risk_function <- function(theta, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function, debug = FALSE, return_loss = FALSE, V = NULL, oracle = FALSE) {
   LRR <- as.matrix(theta)
   if(!(nrow(LRR) == length(A) && nrow(LRR) == length(EY1W))) {
     stop("Input lengths dont match")
@@ -93,7 +94,7 @@ efficient_risk_function <- function(theta, A, Y, EY1W, EY0W, pA1W, weights, effi
   #EY <- ifelse(A==1, EY1W, EY0W)
   #plugin_risk <- (EY0W + EY1W) * log(1 + exp(LRR)) - EY1W * LRR
   #score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR)) - LRR)*(Y - EY)
-  DR_loss <- weights*apply(as.matrix(LRR), 2, efficient_loss_function, A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
+  DR_loss <- weights*apply(as.matrix(LRR), 2, efficient_loss_function, V = V, A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W, oracle = oracle)
   if(debug){
     #print(colMeans(weights * score_comp))
   }

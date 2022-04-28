@@ -45,30 +45,41 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
 
   full_fit_ERM <- train_learners(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = V)
   if(use_sieve_selector) {
-    all_ERM_full_best <- subset_best_sieve(full_fit_ERM, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function)
+    all_ERM_full_best <- subset_best_sieve(full_fit_ERM, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function, V = V)
   } else {
     all_ERM_full_best <- full_fit_ERM
   }
    all_ERM_full_predictions <- do.call(cbind, lapply(all_ERM_full_best, `[[`, "ERM_pred"))
-  output_list <- list(learners = all_ERM_full_best, pA1W = pA1W, EY1W = EY1W, EY0W = EY0W)
+  output_list <- list(learners = all_ERM_full_best, pA1W = pA1W, EY1W = EY1W, EY0W = EY0W, learner_names = learner_names)
   if(cross_validate_ERM) {
-    if(use_sieve_selector) {
-      print("use_sieve_selector is overwritten to TRUE when cross_validate_ERM = TRUE")
-      use_sieve_selector <- TRUE
-    }
+
     learners_all_folds <- lapply(folds, train_learners_using_fold, V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = V )
     names(learners_all_folds) <- seq_along(folds)
     learners_all_folds <- unlist(learners_all_folds)
     learner_sieve_names <- names(learners_all_folds)
     learners_all_folds_delayed <- bundle_delayed(learners_all_folds)
     learners_all_folds <- learners_all_folds_delayed$compute()
-    learners_best_sieve_all_folds <- subset_best_sieve_all_folds(folds, learners_all_folds, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function = efficient_loss_function)
+    if(use_sieve_selector) {
+      learners_best_sieve_all_folds <- subset_best_sieve_all_folds(folds, learners_all_folds, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function = efficient_loss_function)
+    } else {
+
+      learners_best_sieve_all_folds <- lapply(seq_along(folds), function(fold_number) {
+        fold <- folds[[fold_number]]
+        training_index <- origami::training(fold = fold)
+        keep <- which(stringr::str_detect(names(learners_all_folds), paste0("^", fold_number, "\\.", "+")))
+        learners <- learners_all_folds[keep]
+        return(learners)
+
+      })
+      names(learners_best_sieve_all_folds) <- seq_along(folds)
+    }
     cv_predictions <- cv_predict_learner(folds, learners_best_sieve_all_folds)
 
     best_learner_index_cv <- which.min(efficient_risk_function(cv_predictions, A , Y, EY1W, EY0W, pA1W, weights, efficient_loss_function))
 
     all_ERM_full_predictions <- all_ERM_full_predictions[,best_learner_index_cv]
     output_list$cv_index <- best_learner_index_cv
+    output_list$cv_predictions <- cv_predictions
   }
 
   return(output_list)
@@ -79,7 +90,7 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
 }
 
 #' @export
-predict <- function(output, Wpred) {
+predict <- function(output, Wpred, subset_cv = TRUE) {
 
   learners <- output$learners
   task <- sl3_Task$new(as.data.table(Wpred), covariates = colnames(Wpred), outcome = c())
@@ -100,7 +111,7 @@ predict <- function(output, Wpred) {
   })
   preds <- do.call(cbind, pred_list)
   cv_index <- output$cv_index
-  if(!is.null(cv_index)) {
+  if(!is.null(cv_index) & subset_cv) {
     preds <- preds[, cv_index]
   }
 

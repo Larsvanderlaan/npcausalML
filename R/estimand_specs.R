@@ -40,11 +40,13 @@ weight_function_sieve_IPW_CATE <- function(A , Y, EY1W , EY0W , pA1W ){
 
 
 #' @export
-efficient_loss_function_CATE <- function(theta, A , Y, EY1W , EY0W , pA1W){
-  pA <-  1/ifelse(A==1,pA1W, 1- pA1W)
+efficient_loss_function_CATE <- function(V, theta, A , Y, EY1W , EY0W , pA1W, oracle = FALSE){
+  pA <-  ifelse(A==1,pA1W, 1- pA1W)
   EY <- ifelse(A==1, EY1W, EY0W)
   CATE <- EY1W - EY0W
-  loss <- theta^2 - 2 * theta * (CATE + (1/pA)*(Y - EY))
+  loss <- (theta - (CATE + (1/pA)*(A - (1-A))*(Y - EY)))^2
+
+
   return(loss)
 }
 

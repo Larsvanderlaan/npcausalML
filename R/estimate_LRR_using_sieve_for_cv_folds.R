@@ -18,8 +18,8 @@ train_learners_using_fold <- function(fold, V, A, Y, EY1W, EY0W, pA1W, weights, 
   index <- origami::training(fold = fold)
   index_val <- origami::validation(fold = fold)
   Vfull <- V
-  V <- Vfull[index,]
-  Vval <- Vfull[index_val,]
+  V <- Vfull[index, ,drop = F]
+  Vval <- Vfull[index_val,  ,drop = F]
   A <- A[index]
   Y <- Y[index]
   EY1W <- EY1W[index]

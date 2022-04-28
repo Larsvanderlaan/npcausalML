@@ -13,7 +13,8 @@ subset_best_sieve(
   EY0W,
   pA1W,
   weights,
-  efficient_loss_function
+  efficient_loss_function,
+  V = NULL
 )
 }
 \arguments{
