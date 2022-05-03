@@ -22,7 +22,7 @@ train_learner_all_sieves <- function(sl3_Learner, V, A, Y, weights, family_risk_
 
     delayed_plugin_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin"), Vpred = Vpred, transform_function = transform_function)
 
-    delayed_plugin_ERM$compute()
+
     delayed_IPW_ERM <- delayed_fun(estimate_using_ERM)(V, A, Y,  EY1W_star, EY0W_star, pA1W_star, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("IPW"), Vpred = Vpred, transform_function = transform_function)
 
     output <- (list( plugin = delayed_plugin_ERM, IPW = delayed_IPW_ERM))

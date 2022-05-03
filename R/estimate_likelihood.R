@@ -5,6 +5,7 @@
 #' @param sl3_Learner_pA1W A \code{sl3_Learner} object from the \code{tlverse/sl3} R github package that specifies the machine-learning algorithm for learning the propensity score `P(A = 1 | W)`
 #' @param sl3_Learner_EYAW A \code{sl3_Learner} object from the \code{tlverse/sl3} R github package that specifies the machine-learning algorithm for learning the outcome conditional mean `E[Y | A, W]`. NOTE: the treatment arms are pooled in the regression. See the preprocessing sl3_Learner \code{Lrnr_stratified} if you wish to stratify the estimation by treatment.
 #' @param folds A number representing the number of folds to use in cross-fitting or a fold object from the package \code{tlverse/origami}. This parameter will be passed to internal \code{sl3_Task} objects that are fed to the code{sl3_Learner}s.
+#' @export
 estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1W, sl3_Learner_EYAW, folds = 10, outcome_type = NULL) {
 
   data <- data.table(W, A = A, Y = Y, weights = weights)
@@ -43,6 +44,6 @@ estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1
 
 
   internal <-  list(task_pA1W = task_pA1W, task_EY = task_EY, sl3_Learner_pA1W_trained = sl3_Learner_pA1W_trained, sl3_Learner_EYAW_trained = sl3_Learner_EYAW_trained, folds = folds)
-  output <- list(pA1W = pA1W, EY1W = EY1W, EY0W = EY0W, internal = internal)
+  output <- list(pA1W = pA1W, EY1W = EY1W, EY0W = EY0W,folds = folds, internal = internal)
   return(output)
 }

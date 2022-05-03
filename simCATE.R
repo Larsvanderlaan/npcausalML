@@ -2,49 +2,65 @@
 
 sim.CATE <- function(n, hard = TRUE, positivity = TRUE, ...) {
   if(!positivity & !hard) {
-    W <- runif(n, -1 , 1)
-    pA1W <- plogis(sin(4*W))
+    W1 <- runif(n, -1 , 1)
+    W2 <- runif(n, -1 , 1)
+    W3 <- runif(n, -1 , 1)
+    W <- data.table(W1, W2, W3)
+    pA1W <- plogis((W1 + W2 + W3)/3)
+    quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
-    quantile(plogis(W))
-    CATE <- 1 + W
-    EY0W <- W + sin(5*W) + 1/(W + 1.2)
+    CATE <- 1 + W1
+    EY0W <- 0.5*(W1 + W2 + W3) + sin(5*W1) + sin(5*W2) + sin(5*W3) + 1/(W1 + 1.2) + 1/(W2 + 1.2) + 1/(W3 + 1.2)
     EY1W <- EY0W + CATE
-    Y <- rnorm(n, EY0W + A*CATE, 0.5)
+    Y <- rnorm(n, EY0W + A*CATE, 2)
   }
 
   ## hardCATE
   if(!positivity & hard) {
-    W <- runif(n, -1 , 1)
-    pA1W <- plogis(sin(4*W))
+
+
+    W1 <- runif(n, -1 , 1)
+    W2 <- runif(n, -1 , 1)
+    W3 <- runif(n, -1 , 1)
+    W <- data.table(W1, W2, W3)
+    pA1W <- plogis((W1 + W2 + W3)/3)
+    quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
-    quantile(plogis(W))
-    CATE <- 1 + W + sin(5*W)
-    EY0W <- W + sin(5*W) + 1/(W + 1.2)
+    CATE <- 1 + W1 + sin(5*W1)
+    EY0W <- 0.5*(W1 + W2 + W3) + sin(5*W1) + sin(5*W2) + sin(5*W3) + 1/(W1 + 1.2) + 1/(W2 + 1.2) + 1/(W3 + 1.2)
     EY1W <- EY0W + CATE
-    Y <- rnorm(n, EY0W + A*CATE, 0.5)
+    Y <- rnorm(n, EY0W + A*CATE, 2)
+
+
   }
   ##  positivity
   ## easy CATE
   if(positivity & !hard) {
-    W <- runif(n, -1 , 1)
-    pA1W <- plogis(3*sin(4*W))
+    W1 <- runif(n, -1 , 1)
+    W2 <- runif(n, -1 , 1)
+    W3 <- runif(n, -1 , 1)
+    W <- data.table(W1, W2, W3)
+    pA1W <- plogis((W1 + W2 + W3))
+    quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
-    quantile(plogis(W))
-    CATE <- 1 + W
-    EY0W <- W + sin(5*W) + 1/(W + 1.2)
+    CATE <- 1 + W1
+    EY0W <- 0.5*(W1 + W2 + W3) + sin(5*W1) + sin(5*W2) + sin(5*W3) + 1/(W1 + 1.2) + 1/(W2 + 1.2) + 1/(W3 + 1.2)
     EY1W <- EY0W + CATE
-    Y <- rnorm(n, EY0W + A*CATE, 0.5)
+    Y <- rnorm(n, EY0W + A*CATE, 2)
   }
   ## hardCATE
   if(positivity & hard) {
-    W <- runif(n, -1 , 1)
-    pA1W <-  plogis(3*sin(4*W))
-    A <- rbinom(n, 1 ,  pA1W)
+    W1 <- runif(n, -1 , 1)
+    W2 <- runif(n, -1 , 1)
+    W3 <- runif(n, -1 , 1)
+    W <- data.table(W1, W2, W3)
+    pA1W <- plogis((W1 + W2 + W3))
     quantile(pA1W)
-    CATE <- 1 + W + sin(5*W)
-    EY0W <- W + sin(5*W) + 1/(W + 1.2)
+    A <- rbinom(n, 1 ,  pA1W)
+    CATE <- 1 + W1 + sin(5*W1)
+    EY0W <- 0.5*(W1 + W2 + W3) + sin(5*W1) + sin(5*W2) + sin(5*W3) + 1/(W1 + 1.2) + 1/(W2 + 1.2) + 1/(W3 + 1.2)
     EY1W <- EY0W + CATE
-    Y <- rnorm(n, EY0W + A*CATE, 0.5)
+    Y <- rnorm(n, EY0W + A*CATE, 2)
 
   }
   return(data.table(W, A, Y, EY0W, EY1W, pA1W))
@@ -80,15 +96,13 @@ list_of_sieves <- list_of_sieves <- list(
   fourier_basis$new(orders = c(3,2))
 )
 
-list_of_sieves_uni <- list_of_sieves <- list(
+list_of_sieves_uni   <- list(
   NULL,
   fourier_basis$new(orders = c(1,0)),
   fourier_basis$new(orders = c(2,0)),
   fourier_basis$new(orders = c(3,0)),
   fourier_basis$new(orders = c(4,0)),
-  fourier_basis$new(orders = c(5,0)),
-  fourier_basis$new(orders = c(6,0)),
-  fourier_basis$new(orders = c(7,0))
+  fourier_basis$new(orders = c(5,0))
 )
 
 #out <- estCATE(250,  lrnr_stack, 1, sim.CATE, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
@@ -100,6 +114,7 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
   library(sl3)
   list_cateonestep <- list()
   list_cateplugin_adaptive <- list()
+  list_cateplugin_adaptivetmle <- list()
   list_cateplugin_oracle <- list()
   list_cateonestep_oracle <- list()
   list_catesubst <- list()
@@ -121,22 +136,13 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
     # sieve method
     lrnr_Y <- make_learner(Pipeline, Lrnr_cv$new(
       Stack$new(
-        Lrnr_stratified$new(Lrnr_glm$new(), variable_stratify = "A"),
-        Lrnr_stratified$new(Lrnr_gam$new(), variable_stratify = "A"),
-        Lrnr_earth$new(),
-        Lrnr_xgboost$new(max_depth = 3),
-        Lrnr_xgboost$new(max_depth = 4),
-        Lrnr_xgboost$new(max_depth = 5)
+        Lrnr_hal9001$new(smoothness_orders = 0, max_degree = 2, num_knots = c(30,30))
       )), Lrnr_cv_selector$new(loss_squared_error))
 
 
     lrnr_A <- make_learner(Pipeline, Lrnr_cv$new(
       Stack$new(
-        Lrnr_gam$new(),
-        Lrnr_earth$new(),
-        Lrnr_xgboost$new(max_depth = 3),
-        Lrnr_xgboost$new(max_depth = 4),
-        Lrnr_xgboost$new(max_depth = 5)
+        Lrnr_hal9001$new(smoothness_orders = 0, max_degree = 2, num_knots = c(30,30))
       )
     ), Lrnr_cv_selector$new(loss_squared_error))
 
@@ -154,6 +160,7 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
 
 
     fit_npcausalML_adaptive <- fit_npcausalML
+    fit_npcausalML_adaptivetmle <- fit_npcausalML
     fit_npcausalML_oracle <- fit_npcausalML
 
 
@@ -161,23 +168,41 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
 
 
     oracle_risk <- function(V, theta, A , Y, EY1W , EY0W , pA1W, oracle = FALSE){
-      (theta - CATE)^2
+       theta^2 - 2*theta*CATE
     }
     print("oracle")
     fit_npcausalML_oracle$learners <- subset_best_sieve(fit_npcausalML$learners, fit_npcausalML$learner_names, A, Y,
                                              fit_npcausalML$EY1W, fit_npcausalML$EY0W, fit_npcausalML$pA1W, rep(1,n),
                                              oracle_risk, V = W)
-    print("ADAPTIVE")
-    fit_npcausalML_adaptive$learners <- subset_best_sieve(fit_npcausalML$learners, fit_npcausalML$learner_names, A, Y,
-                                                          data$EY1, data$EY0, data$pA1W, rep(1,nrow(data)),
+    print("ADAPTIVEtmle")
+    fit_npcausalML_adaptivetmle$learners <- subset_best_sieve(fit_npcausalML$learners, fit_npcausalML$learner_names, A, Y,
+                                                          fit_npcausalML$EY1W, fit_npcausalML$EY0W, fit_npcausalML$pA1W, rep(1,nrow(data)),
                                                         function(V, theta, A , Y, EY1W , EY0W , pA1W, oracle = FALSE){
                                                           pA <-  ifelse(A==1,pA1W, 1- pA1W)
                                                           EY <- ifelse(A==1, EY1W, EY0W)
                                                           CATE <- EY1W - EY0W
-                                                          loss <- (theta - (CATE + (1/pA)*(A - (1-A))*(Y - EY)))^2
+                                                          beta <- coef(lm(Y ~ H - 1, offset = EY, data = list(Y = Y, H = theta*(A - (1-A))), weights = 1/pA))
+                                                          EY1W <- EY1W +  theta*beta
+                                                          EY0W <- EY0W - theta*beta
+                                                          CATE <- EY1W - EY0W
+                                                          EY <- ifelse(A==1, EY1W, EY0W)
+                                                          #print("score")
+                                                          #print(mean(theta*(1/pA)*(A - (1-A))*(Y - EY)))
+                                                          #loss <- theta^2 - theta*(CATE + (1/pA)*(A - (1-A))*(Y - EY))
+                                                          loss <- (theta - (CATE))^2
                                                         }, V = data$W)
 
+    print("ADAPTIVE")
+    fit_npcausalML_adaptive$learners <- subset_best_sieve(fit_npcausalML$learners, fit_npcausalML$learner_names, A, Y,
+                                                          fit_npcausalML$EY1W, fit_npcausalML$EY0W, fit_npcausalML$pA1W, rep(1,nrow(data)),
+                                                          function(V, theta, A , Y, EY1W , EY0W , pA1W, oracle = FALSE){
+                                                            pA <-  ifelse(A==1,pA1W, 1- pA1W)
+                                                            EY <- ifelse(A==1, EY1W, EY0W)
+                                                            CATE <- EY1W - EY0W
 
+                                                            loss <- theta^2 - 2*theta*(CATE + (1/pA)*(A - (1-A))*(Y - EY))
+
+                                                          }, V = data$W)
     # print("ORACLEDR")
     # data_val <- sim_function(n, ...)
     # preds_all <- predict(fit_npcausalML, data.frame(W=data_val$W), subset_cv = FALSE)
@@ -200,6 +225,8 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
 
 
     preds_adaptive <- as.matrix(predict(fit_npcausalML_adaptive, W))
+    preds_adaptivetmle <- as.matrix(predict(fit_npcausalML_adaptivetmle, W))
+
     preds_oracle <- as.matrix(predict(fit_npcausalML_oracle, W))
 
 
@@ -225,6 +252,9 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
     risk_plugin_adaptive <- apply(preds_adaptive, 2, function(est) {
       mean((CATE - est)^2)
     })
+    risk_plugin_adaptivetmle <- apply(preds_adaptivetmle, 2, function(est) {
+      mean((CATE - est)^2)
+    })
     risk_plugin_oracle <- apply(preds_oracle, 2, function(est) {
       mean((CATE - est)^2)
     })
@@ -244,17 +274,19 @@ estCATE <- function(n, CATE_library, nsims, sim_function, sieve_list, ...) {
     list_cateonestep_oracle[[i]] <- risks_onestep_oracle
     list_cateplugin_oracle[[i]] <- risk_plugin_oracle
     list_cateplugin_adaptive[[i]] <- risk_plugin_adaptive
+    list_cateplugin_adaptivetmle[[i]] <- risk_plugin_adaptivetmle
     list_catesubst[[i]] <- risk_subst
   }
   cateonestep <- rowMeans(do.call(cbind, list_cateonestep))
   cateonestep_oracle <- rowMeans(do.call(cbind, list_cateonestep_oracle))
   cateplugin_oracle <- rowMeans(do.call(cbind, list_cateplugin_oracle))
   cateplugin_adaptive <- rowMeans(do.call(cbind, list_cateplugin_adaptive))
+  cateplugin_adaptivetmle <- rowMeans(do.call(cbind, list_cateplugin_adaptivetmle))
 
   causalforest <- rowMeans(do.call(cbind, list_causalforest))
   subst <- mean(unlist(list_catesubst))
 
-  return(data.table(subst, causalforest,  cateonestep_oracle, cateonestep, cateplugin_adaptive, cateplugin_oracle, lrnr = names(cateplugin_adaptive)))
+  return(data.table(subst, causalforest,  cateonestep_oracle, cateonestep, cateplugin_adaptive, cateplugin_adaptivetmle, cateplugin_oracle, lrnr = names(cateplugin_adaptive)))
 
 
 

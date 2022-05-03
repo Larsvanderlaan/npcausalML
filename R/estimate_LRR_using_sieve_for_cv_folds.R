@@ -27,7 +27,7 @@ train_learners_using_fold <- function(fold, V, A, Y, EY1W, EY0W, pA1W, weights, 
   pA1W <- pA1W[index]
   weights <- weights[index]
 
-  all_learners_delayed <- train_learners(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = Vval, compute = FALSE)
+  all_learners_delayed <- train_learners(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = Vval, compute = F)
   return(all_learners_delayed)
 }
 
@@ -65,13 +65,14 @@ cv_predict_learner <- function(folds, learners_all_folds) {
   cv_fun <- function(fold) {
     fold_number <- fold_index()
     index <- validation()
-    v <- origami::fold_index(fold = fold)
+    preds <- as.data.table(do.call(cbind, lapply(learners_all_folds[[fold_number]] , `[[`, "ERM_pred")))
+    colnames(preds) <- gsub("[0-9]+[.]", "", names(learners_all_folds[[fold_number]]))
     list(index = index,
-         fold_index = rep(fold_index(), length(index)), predictions=as.data.table(do.call(cbind, lapply(learners_all_folds[[v]] , `[[`, "ERM_pred"))))
+         fold_index = rep(fold_number, length(index)), predictions= preds)
   }
   comb_ctrl <- list(combiners = list(
     index = combiner_c, fold_index = combiner_c,
-    predictions = function(x) rbindlist(x, fill = TRUE)
+    predictions = function(x) rbindlist(x)
   ))
   cv_predictions <- origami::cross_validate(cv_fun, folds, .combine_control = comb_ctrl)
   cv_predictions <- as.matrix(cv_predictions$predictions[order(cv_predictions$index),] )

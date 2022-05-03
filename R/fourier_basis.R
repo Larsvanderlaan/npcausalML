@@ -14,7 +14,7 @@
 #'
 #' @family Basis
 #'
-#
+#' @export
 fourier_basis <- R6Class(
   classname = "fourier_basis",
   portable = TRUE, class = TRUE,

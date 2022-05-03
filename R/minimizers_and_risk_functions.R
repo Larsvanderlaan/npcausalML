@@ -18,7 +18,8 @@
 #' @param logit_transform An internal argument specifying whether the predictions of \code{sl3_LRR_Learner_binomial} should be logit-transformed.
 #' This argument is needed since the LRR predictions correspond with the logit-scale predictor and not probability-scale predictions of the binomial learner.
 #' For most \code{sl3_Learner}s, the default `logit_transform = TRUE` is necessary for this method to work correctly.
-estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin", "IPW"), Vpred = W, transform_function = function(x){x}) {
+#' @export
+estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_function, sl3_Learner,  outcome_function_plugin, weight_function_plugin, outcome_function_IPW, weight_function_IPW , learning_method = c("plugin", "IPW"), Vpred = V, transform_function = function(x){x}) {
 
   learning_method <- match.arg(learning_method)
   data <- as.data.table(V)
@@ -60,7 +61,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
 
   }
 
-  task_ERM_pred <- sl3_Task$new(as.data.table(Vpred), covariates = covariates, outcome = c())
+  task_ERM_pred <- sl3_Task$new(as.data.table(Vpred), covariates = covariates, outcome = c(), outcome_type = "continuous")
 
   sl3_Learner_trained <- sl3_Learner$train(task_ERM[task_ERM$weights!=0])
   ERM <- sl3_Learner_trained$predict(task_ERM)

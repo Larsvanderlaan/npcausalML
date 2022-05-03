@@ -22,7 +22,7 @@ weight_function_IPW_CATE <- function(A, Y, EY1W, EY0W, pA1W) {
 
 #' @export
 design_function_sieve_plugin_CATE <- function(X,A , Y, EY1W , EY0W , pA1W ) {
-  cbind(A*X, (1-A)*X)
+   (A*X-(1-A)*X)/ifelse(A==1,pA1W, 1- pA1W)
 }
 #' @export
 design_function_sieve_IPW_CATE <- function(X,A , Y, EY1W , EY0W , pA1W ){
@@ -31,7 +31,7 @@ design_function_sieve_IPW_CATE <- function(X,A , Y, EY1W , EY0W , pA1W ){
 }
 #' @export
 weight_function_sieve_plugin_CATE <- function(A , Y, EY1W , EY0W , pA1W ){
-  1/ifelse(A==1,pA1W, 1- pA1W)
+  rep(1, length(A))#1/ifelse(A==1,pA1W, 1- pA1W)
 }
 #' @export
 weight_function_sieve_IPW_CATE <- function(A , Y, EY1W , EY0W , pA1W ){
@@ -44,7 +44,7 @@ efficient_loss_function_CATE <- function(V, theta, A , Y, EY1W , EY0W , pA1W, or
   pA <-  ifelse(A==1,pA1W, 1- pA1W)
   EY <- ifelse(A==1, EY1W, EY0W)
   CATE <- EY1W - EY0W
-  loss <- (theta - (CATE + (1/pA)*(A - (1-A))*(Y - EY)))^2
+  loss <- theta^2 - 2*theta*(CATE + (1/pA)*(A - (1-A))*(Y - EY))
 
 
   return(loss)

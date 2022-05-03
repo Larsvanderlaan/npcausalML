@@ -14,11 +14,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(future)
 plan(multicore)
-ns <- c(250, 500, 1000, 2500)
+ns <- c( 1500)
  
 
 output <- lapply(ns, function(n) {
-  out <- estCATE(n,  list( Lrnr_glm$new(), Lrnr_gam$new(), Lrnr_xgboost$new(max_depth = 4), Lrnr_hal9001$new(max_degree = 1, num_knots = 10, lambda = 1e-10, fit_control = list(cv_select = F))), 20, sim.CATE, list_of_sieves_uni, positivity = FALSE, hard = FALSE)
+  out <- estCATE(n,  list( Lrnr_glm$new(), Lrnr_rpart$new(),   Lrnr_gam$new(), Lrnr_earth$new(),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0)) , 20, sim.CATE, list_of_sieves_uni, positivity = F, hard = F)
   out$n <- n
   out
 })
@@ -30,6 +30,7 @@ output <- do.call(rbind, output)
 
 
 ```{r, fig.width = 4, fig.height=4}
+library(ggplot2)
 dt <- as.data.table(output) #fread("CATEsims_posFALSEhardFALSE_first.csv")
 dt$lrnr <- gsub(".+glm.+", "lm", dt$lrnr )
 dt$lrnr <- gsub(".+earth.+", "earth", dt$lrnr )
@@ -38,6 +39,7 @@ dt$lrnr <- gsub(".+ranger.+", "randomForest", dt$lrnr )
 dt$lrnr <- gsub("(.+xgboost_20_1_)", "xgboost_depth=", dt$lrnr )
 
 dt_long <- unique(rbind(data.table(n = dt$n, MSE = dt$cateplugin_adaptive, lrnr = dt$lrnr, method = "SievePluginAdapt"),
+                        data.table(n = dt$n, MSE = dt$cateplugin_adaptive, lrnr = dt$lrnr, method = "SievePluginAdapttmle"),
                         data.table(n = dt$n, MSE = dt$cateplugin_oracle, lrnr = dt$lrnr, method = "SievePluginOracle"),
       data.table(n = dt$n, MSE = dt$cateonestep, lrnr = dt$lrnr, method = "OneStep"),
       data.table(n = dt$n, MSE = dt$cateonestep_oracle, lrnr = dt$lrnr, method = "OneStepOracle"),
@@ -48,10 +50,11 @@ tmp <- do.call(rbind, lapply(unique(dt$lrnr) , function(lrnr) {
   data.table(n = dt$n, MSE = dt$subst, lrnr = lrnr, method = "SubstitutionEnsemble")
 }))
 dt_long <- rbind(dt_long, tmp)
-
+dt_long <- unique(dt_long)
+dt_long <- dt_long[order(dt_long$lrnr)]
 dt_long <- dt_long[dt_long$n >= 250]
 dt_long$MSE <- sqrt(dt_long$MSE)
- 
+ dt_long
 ggplot(dt_long, aes(x=n, y = MSE, group = method, color = method)) + geom_line() + scale_y_log10() + facet_wrap(. ~  lrnr,   scale = "free")
 ```
 

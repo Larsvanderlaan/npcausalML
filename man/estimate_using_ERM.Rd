@@ -19,7 +19,7 @@ estimate_using_ERM(
   outcome_function_IPW,
   weight_function_IPW,
   learning_method = c("plugin", "IPW"),
-  Vpred = W,
+  Vpred = V,
   transform_function = function(x) {     x }
 )
 }

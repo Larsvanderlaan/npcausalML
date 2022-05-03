@@ -82,10 +82,11 @@ compute_plugin_and_IPW_sieve_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, we
   #print(quantile(as.vector(plogis(qlogis(EY1W_scaled) + X1_pseudo_plugin %*% beta_plugin))))
   #print(quantile(as.vector(plogis(qlogis(EY0W_scaled) + X0_pseudo_plugin %*% beta_plugin))))
 
-  if(debug) {
+  if(F) {
     EYstar <- ifelse(A==1, EY1W_star, EY0W_star )
     print("Sieve scores plugin")
-    print(quantile(abs(colMeans(weights_pseudo_plugin*X_pseudo_plugin*(Y_scaled - as.vector(plogis(qlogis(EY_scaled) + X_pseudo_plugin %*% beta_plugin)))))))
+    print(dim(X_pseudo_plugin))
+    print(quantile(abs(colMeans(weights_pseudo_plugin*X_pseudo_plugin*(Y - EYstar)))))
 
   }
 

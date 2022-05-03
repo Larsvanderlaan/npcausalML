@@ -19,12 +19,17 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
   }
   weights <- as.vector(weights)
 
-  try({
-    likelihood <- estimate_initial_likelihood(W, A, Y, weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, folds = folds, outcome_type = outcome_type)
-    EY1W <- likelihood$EY1W
-    EY0W <- likelihood$EY0W
-    pA1W <- likelihood$pA1W
-  })
+  if(is.null(EY1W) || missing(EY1W)) {
+    try({
+      if(is.null(sl3_Learner_EYAW) || is.null(sl3_Learner_pA1W)) {
+        stop("No Learners")
+      }
+      likelihood <- estimate_initial_likelihood(W, A, Y, weights, sl3_Learner_EYAW = sl3_Learner_EYAW, sl3_Learner_pA1W = sl3_Learner_pA1W, folds = folds, outcome_type = outcome_type)
+      EY1W <- likelihood$EY1W
+      EY0W <- likelihood$EY0W
+      pA1W <- likelihood$pA1W
+    })
+  }
   EY1W <- as.vector(EY1W)
   EY0W <- as.vector(EY0W)
   pA1W <- as.vector(pA1W)
@@ -49,7 +54,7 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
   } else {
     all_ERM_full_best <- full_fit_ERM
   }
-   all_ERM_full_predictions <- do.call(cbind, lapply(all_ERM_full_best, `[[`, "ERM_pred"))
+  all_ERM_full_predictions <- do.call(cbind, lapply(all_ERM_full_best, `[[`, "ERM_pred"))
   output_list <- list(learners = all_ERM_full_best, pA1W = pA1W, EY1W = EY1W, EY0W = EY0W, learner_names = learner_names)
   if(cross_validate_ERM) {
 
@@ -58,7 +63,10 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
     learners_all_folds <- unlist(learners_all_folds)
     learner_sieve_names <- names(learners_all_folds)
     learners_all_folds_delayed <- bundle_delayed(learners_all_folds)
+    print("HERE")
+
     learners_all_folds <- learners_all_folds_delayed$compute()
+    print("Computed")
     if(use_sieve_selector) {
       learners_best_sieve_all_folds <- subset_best_sieve_all_folds(folds, learners_all_folds, learner_names, A, Y, EY1W, EY0W, pA1W, weights, efficient_loss_function = efficient_loss_function)
     } else {
@@ -74,10 +82,11 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
       names(learners_best_sieve_all_folds) <- seq_along(folds)
     }
     cv_predictions <- cv_predict_learner(folds, learners_best_sieve_all_folds)
-
+    print(dim(cv_predictions))
     best_learner_index_cv <- which.min(efficient_risk_function(cv_predictions, A , Y, EY1W, EY0W, pA1W, weights, efficient_loss_function))
 
     all_ERM_full_predictions <- all_ERM_full_predictions[,best_learner_index_cv]
+    output_list$learners_best_sieve_all_folds <- learners_best_sieve_all_folds
     output_list$cv_index <- best_learner_index_cv
     output_list$cv_predictions <- cv_predictions
   }
