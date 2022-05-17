@@ -14,8 +14,11 @@ SL.gam5 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 5
   SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
-hard <- F
-pos <- T
+lrnr_gam3 <- Lrnr_pkg_SuperLearner$new("SL.gam3" )
+lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" )
+lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" )
+hard <- T
+pos <- F
 
 onesim <- function(n) {
 
@@ -51,7 +54,7 @@ lrnr_A <- make_learner(Pipeline, Lrnr_cv$new(
 ), Lrnr_cv_selector$new(loss_squared_error))
 
 
-data_train <-  as.data.frame(sim.CATE(n, hard, pos))
+data_train <-  data #as.data.frame(sim.CATE(n, hard, pos))
 
 initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,c("W1", "W2","W3")], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 10)
 data1 <- data
@@ -69,13 +72,23 @@ EY0W_est <- initial_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY0)
 pA1W_est <- pmax(pA1W_est, 0.05)
 pA1W_est <- pmin(pA1W_est, 0.95)
 
-lrnr_gam3 <- Lrnr_pkg_SuperLearner$new("SL.gam3" )
-lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" )
-lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" )
+CATE_library <- list(  Lrnr_ranger$new(max.depth = 7), Lrnr_ranger$new(max.depth = 10), Lrnr_ranger$new(max.depth = 13),  Lrnr_earth$new(), Lrnr_xgboost$new(max_depth = 3, verbosity = 0), Lrnr_xgboost$new(max_depth = 5, verbosity = 0),   Lrnr_xgboost$new(max_depth = 7, verbosity = 0), Lrnr_rpart$new(), lrnr_gam3, lrnr_gam4 , lrnr_gam5, Lrnr_glm$new()    )
+CATE_library_strat <- lapply(CATE_library , function (lrnr) {
+  Lrnr_stratified$new(lrnr, "A")
+})
+
+subst_compare <- Stack$new(CATE_library_strat)
+
+
+subst_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,c("W1", "W2","W3")], data_train$A, data_train$Y,  weights = rep(1,n), Lrnr_glm$new(), subst_compare, folds = 1)
+subst_EY1W <- subst_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY1)
+subst_EY0W <- subst_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY0)
+subst_CATE <- subst_EY1W - subst_EY0W
 
 
 
-CATE_library <- list(Lrnr_svm$new(), Lrnr_ranger$new(max.depth = 8), Lrnr_ranger$new(max.depth = 10), Lrnr_ranger$new(max.depth = 15), Lrnr_ranger$new(max.depth = 25), Lrnr_earth$new(), Lrnr_xgboost$new(max_depth = 3, verbosity = 0), Lrnr_xgboost$new(max_depth = 5, verbosity = 0),   Lrnr_xgboost$new(max_depth = 7, verbosity = 0), Lrnr_rpart$new(), lrnr_gam3, lrnr_gam4 , lrnr_gam5, Lrnr_glm$new()    )
+
+
 
 
 fit_npcausalML <- npcausalML(CATE_library,
@@ -125,7 +138,9 @@ CATEonestepbenchoracle <- apply(CATEonestepbenchoracle, 2, function(pred) {
 })
 
 
-risk_subst<-  mean((CATE - (EY1W_est  - EY0W_est))^2)
+risk_subst<-  apply(subst_CATE, 2, function(pred) {
+  mean((pred - CATE)^2)
+})
 
 Y.hat <- EY1W_est * pA1W_est + EY0W_est * (1-pA1W_est)
 W.hat <- pA1W_est
@@ -144,7 +159,7 @@ simresults <- lapply(1:20, function(i){
   onesim(500)
 })
 
-save(simresults, file = "simsCATEFTn500_2")
+save(simresults, file = "simsCATETFn500_2")
 
 
 print(1000)
@@ -153,7 +168,7 @@ simresults <- lapply(1:20, function(i){
   onesim(1000)
 })
 
-save(simresults, file = "simsCATEFTn1000_2")
+save(simresults, file = "simsCATETFn1000_2")
 
 print(2500)
 simresults <- lapply(1:20, function(i){
@@ -161,7 +176,7 @@ simresults <- lapply(1:20, function(i){
   onesim(2500)
 })
 
-save(simresults, file = "simsCATEFTn2500_2")
+save(simresults, file = "simsCATETFn2500_2")
 
 print(5000)
 simresults <- lapply(1:20, function(i){
@@ -169,7 +184,7 @@ simresults <- lapply(1:20, function(i){
   onesim(5000)
 })
 
-save(simresults, file = "simsCATEFTn5000_2")
+save(simresults, file = "simsCATETFn5000_2")
 
 
 print(10000)
@@ -178,7 +193,7 @@ simresults <- lapply(1:20, function(i){
   onesim(10000)
 })
 
-save(simresults, file = "simsCATEFTn10000_2")
+save(simresults, file = "simsCATETFn10000_2")
 
 
 onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, 1)))

@@ -14,6 +14,13 @@ SL.gam5 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 5
   SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
+
+
+lrnr_gam3 <- Lrnr_pkg_SuperLearner$new("SL.gam3" )
+lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" )
+lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" )
+
+
 hard <- T
 pos <- T
 
@@ -51,13 +58,14 @@ onesim <- function(n) {
   ), Lrnr_cv_selector$new(loss_squared_error))
 
 
-  data_train <-  as.data.frame(sim.CATE(n, hard, pos))
+  data_train <-  data #as.data.frame(sim.CATE(n, hard, pos))
 
   initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,c("W1", "W2","W3")], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 10)
   data1 <- data
   data0 <- data
   data1$A <- 1
   data0$A <- 0
+  taskY <- sl3_Task$new(data, covariates = c("W1", "W2", "W3", "A"), outcome = "Y")
   taskY0 <- sl3_Task$new(data0, covariates = c("W1", "W2", "W3", "A"), outcome = "Y")
   taskY1 <- sl3_Task$new(data1, covariates = c("W1", "W2", "W3", "A"), outcome = "Y")
   taskA <- sl3_Task$new(data, covariates = c("W1", "W2", "W3"), outcome = "A")
@@ -65,17 +73,23 @@ onesim <- function(n) {
   pA1W_est <- initial_likelihood$internal$sl3_Learner_pA1W_trained$predict(taskA)
   EY1W_est <- initial_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY1)
   EY0W_est <- initial_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY0)
+
   pA1W_est <- pmax(pA1W_est, 0.05)
   pA1W_est <- pmin(pA1W_est, 0.95)
 
+  CATE_library <- list(  Lrnr_ranger$new(max.depth = 7), Lrnr_ranger$new(max.depth = 10), Lrnr_ranger$new(max.depth = 13),  Lrnr_earth$new(), Lrnr_xgboost$new(max_depth = 3, verbosity = 0), Lrnr_xgboost$new(max_depth = 5, verbosity = 0),   Lrnr_xgboost$new(max_depth = 7, verbosity = 0), Lrnr_rpart$new(), lrnr_gam3, lrnr_gam4 , lrnr_gam5, Lrnr_glm$new()    )
 
-  lrnr_gam3 <- Lrnr_pkg_SuperLearner$new("SL.gam3" )
-  lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" )
-  lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" )
+  subst_compare <- Stack$new(CATE_library)
+  CATE_library_strat <- lapply(CATE_library , function (lrnr) {
+    Lrnr_stratified$new(lrnr, "A")
+  })
 
+  subst_compare <- Stack$new(CATE_library_strat)
+  subst_compare <- subst_compare$train(taskY)
+   subst_EY1W <-subst_compare$predict(taskY1)
+  subst_EY0W <- subst_compare$predict(taskY0)
+  subst_CATE <- subst_EY1W - subst_EY0W
 
-
-  CATE_library <- list(Lrnr_svm$new(), Lrnr_ranger$new(max.depth = 8), Lrnr_ranger$new(max.depth = 10), Lrnr_ranger$new(max.depth = 15), Lrnr_ranger$new(max.depth = 25), Lrnr_earth$new(), Lrnr_xgboost$new(max_depth = 3, verbosity = 0), Lrnr_xgboost$new(max_depth = 5, verbosity = 0),   Lrnr_xgboost$new(max_depth = 7, verbosity = 0), Lrnr_rpart$new(), lrnr_gam3, lrnr_gam4 , lrnr_gam5, Lrnr_glm$new()    )
 
 
 
@@ -115,13 +129,10 @@ onesim <- function(n) {
     mean(loss)
   })[-grep("IPW", colnames(fit_npcausalML$cv_predictions))])
 
-
-  #CATE_library <- list(Lrnr_ranger$new(max.depth = 8), Lrnr_ranger$new(max.depth = 10), Lrnr_ranger$new(max.depth = 15), Lrnr_ranger$new(max.depth = 25))
   CATEonestepbench <- DR_learner(CATE_library, W1, A, Y, EY1W_est, EY0W_est, pA1W_est, NULL, NULL)
   CATEonestepbench <- apply(CATEonestepbench, 2, function(pred) {
     mean((pred - CATE)^2)
   })
-  #CATEonestepbench
 
   CATEonestepbenchoracle <- DR_learner(CATE_library, W1, A, Y, EY1Wtrue, EY0Wtrue, pA1Wtrue, NULL, NULL)
   CATEonestepbenchoracle <- apply(CATEonestepbenchoracle, 2, function(pred) {
@@ -129,7 +140,9 @@ onesim <- function(n) {
   })
 
 
-  risk_subst<-  mean((CATE - (EY1W_est  - EY0W_est))^2)
+  risk_subst<-  apply(subst_CATE, 2, function(pred) {
+    mean((pred - CATE)^2)
+  })
 
   Y.hat <- EY1W_est * pA1W_est + EY0W_est * (1-pA1W_est)
   W.hat <- pA1W_est
@@ -140,13 +153,16 @@ onesim <- function(n) {
 
   list(risk_cf = risk_cf, risk_subst = risk_subst, CATEonestepbenchoracle =CATEonestepbenchoracle, CATEonestepbench = CATEonestepbench, sieve =data.frame(grep("plugin", colnames(fit_npcausalML$cv_predictions), value = T), cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
+
+
 print(500)
 simresults <- lapply(1:20, function(i){
   print(i)
   onesim(500)
 })
 
-save(simresults, file = "simsCATETTn500")
+save(simresults, file = "simsCATETTn500_2")
+
 
 print(1000)
 simresults <- lapply(1:20, function(i){
@@ -154,7 +170,7 @@ simresults <- lapply(1:20, function(i){
   onesim(1000)
 })
 
-save(simresults, file = "simsCATETTn1000")
+save(simresults, file = "simsCATETTn1000_2")
 
 print(2500)
 simresults <- lapply(1:20, function(i){
@@ -162,7 +178,7 @@ simresults <- lapply(1:20, function(i){
   onesim(2500)
 })
 
-save(simresults, file = "simsCATETTn2500")
+save(simresults, file = "simsCATETTn2500_2")
 
 print(5000)
 simresults <- lapply(1:20, function(i){
@@ -170,7 +186,7 @@ simresults <- lapply(1:20, function(i){
   onesim(5000)
 })
 
-save(simresults, file = "simsCATETTn5000")
+save(simresults, file = "simsCATETTn5000_2")
 
 
 print(10000)
@@ -179,15 +195,11 @@ simresults <- lapply(1:20, function(i){
   onesim(10000)
 })
 
-save(simresults, file = "simsCATETTn10000")
+save(simresults, file = "simsCATETTn10000_2")
 
 
-load("simsCATEFFn10000_2")
-onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbenchoracle")))
-onestepbench  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbench")))
-
-causalforestrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_cf")))
-substrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst")))
+onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, 1)))
+onestepbench  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, 2)))
 
 
 
@@ -206,105 +218,15 @@ risks_oracle <- rowMeans(do.call(cbind, lapply(simresults, function(item) {
 })) )
 
 dt <- data.table(lrnr_full = lrnr_names, cvrisksDRoracle,cvrisksDR,  risks_oracle)
-dt$degree <- as.numeric(stringr::str_match(dt$lrnr_full, "fourier_basis_([0-9]+)")[,2])
-dt$degree[grep("no_sieve", dt$lrnr_full)] <- 0
-#tmp <- data.table(risks_oracle = onestepbench, lrnr_full = names(onestepbench), degree = "onestep")
-#dt <- rbind(dt, tmp, fill = T)
-#tmp <- data.table(risks_oracle = onestepbenchoracle, lrnr_full = names(onestepbench), degree = "onesteporacle")
-#dt <- rbind(dt, tmp, fill = T)
-
 dt$lrnr[ grep("gam", dt$lrnr_full)] <- "gam"
 dt$lrnr[ grep("glm", dt$lrnr_full)] <- "glm"
 dt$lrnr[ grep("earth", dt$lrnr_full)] <- "earth"
-dt$lrnr[ grep("earth", dt$lrnr_full)] <- "earth"
-dt$lrnr[ grep("rpart", dt$lrnr_full)] <- "rpart"
-dt$lrnr[ grep("xgboost_20_1_5", dt$lrnr_full)] <- "xgboost_5"
-dt$lrnr[ grep("xgboost_20_1_3", dt$lrnr_full)] <- "xgboost_3"
-dt$lrnr[ grep("xgboost_1", dt$lrnr_full)] <- "randomforest"
-dt$lrnr[ grep("xgboost_1", dt$lrnr_full)] <- "randomforest"
-dt$lrnr[ grep("SL.gam", dt$lrnr_full)] <- "gam5"
-dt$lrnr[ grep("Lrnr_gam", dt$lrnr_full)] <- "gamcv"
-dt$lrnr[ grep("svm", dt$lrnr_full)] <- "svm"
-
-dt <- dt[dt$lrnr != "randomforest",]
+dt$degree <- as.numeric(stringr::str_match(dt$lrnr_full, "fourier_basis_([0-9]+)")[,2])
+dt$degree[grep("no_sieve", dt$lrnr_full)] <- 0
 
 library(ggplot2)
 
-ggplot(dt, aes(x = degree, y = cvrisksDRoracle, color = lrnr, group = lrnr)) + geom_line()
+ggplot(dt, aes(x = degree, y = cvrisksDRoracle, color = lrnr, group = lrnr)) + geom_line() + geom_hline(aes(yintercept = ) )
 ggplot(dt, aes(x = degree, y = cvrisksDR, color = lrnr, group = lrnr)) + geom_line()
-ggplot(dt, aes(x = degree, y = risks_oracle, color = lrnr, group = lrnr)) + geom_line() # + geom_hline(yintercept = onestepbench )
+ggplot(dt, aes(x = degree, y = risks_oracle, color = lrnr, group = lrnr)) + geom_line()  + geom_hline(yintercept = onestepbench, color = c("red", "green", "blue"))
 
-
-ns <- c( 1000, 2500, 5000, 10000)
-sims_list <- lapply(ns, function(n) {
-  load(paste0("simsCATEFTn", n,"_2"))
-  onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbenchoracle")))
-  onestepbench  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbench")))
-
-  causalforestrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_cf")))
-  substrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst")))
-
-
-
-  lrnr_names <- simresults[[1]]$sieve[[1]]
-
-  cvrisksDRoracle <- rowMeans(do.call(cbind, lapply(simresults, function(item) {
-    item$sieve$cvrisksDRoracle
-  })) )
-
-  cvrisksDR <- rowMeans(do.call(cbind, lapply(simresults, function(item) {
-    item$sieve$cvrisksDR
-  })) )
-
-  risks_oracle <- rowMeans(do.call(cbind, lapply(simresults, function(item) {
-    item$sieve$risks_oracle
-  })) )
-
-  dt <- data.table(lrnr_full = lrnr_names, cvrisksDRoracle,cvrisksDR,  risks_oracle)
-  dt$degree <- as.numeric(stringr::str_match(dt$lrnr_full, "fourier_basis_([0-9]+)")[,2])
-  dt$degree[grep("no_sieve", dt$lrnr_full)] <- 0
-  tmp <- data.table(risks_oracle = onestepbench, lrnr_full = names(onestepbench), degree = "DR")
-  dt <- rbind(dt, tmp, fill = T)
-  tmp <- data.table(risks_oracle = onestepbenchoracle, lrnr_full = names(onestepbench), degree = "DRoracle")
-  dt <- rbind(dt, tmp, fill = T)
-  tmp <- data.table(risks_oracle = causalforestrisks, lrnr = "causalforest", degree = "causalforest")
-  dt <- rbind(dt, tmp, fill = T)
-  tmp <- data.table(risks_oracle = substrisks, lrnr = "subst", degree = "subst")
-  dt <- rbind(dt, tmp, fill = T)
-
-  dt$lrnr[ grep("gam3", dt$lrnr_full)] <- "gam3"
-  dt$lrnr[ grep("gam4", dt$lrnr_full)] <- "gam4"
-  dt$lrnr[ grep("gam5", dt$lrnr_full)] <- "gam5"
-  dt$lrnr[ grep("glm", dt$lrnr_full)] <- "glm"
-  dt$lrnr[ grep("earth", dt$lrnr_full)] <- "earth"
-  dt$lrnr[ grep("earth", dt$lrnr_full)] <- "earth"
-  dt$lrnr[ grep("rpart", dt$lrnr_full)] <- "rpart"
-  dt$lrnr[ grep("xgboost_20_1_5", dt$lrnr_full)] <- "xgboost_5"
-  dt$lrnr[ grep("xgboost_20_1_3", dt$lrnr_full)] <- "xgboost_3"
-  dt$lrnr[ grep("xgboost_1", dt$lrnr_full)] <- "randomforest"
-  dt$lrnr[ grep("svm", dt$lrnr_full)] <- "svm"
-  dt$lrnr[ grep("ranger", dt$lrnr_full)] <- "ranger"
-  print(dt$lrnr[37:42])
-  dt$lrnr[37:42] <- "gam3"
-  dt$lrnr[43:48] <- "gam4"
-  dt$lrnr[49:54] <- "gam5"
-  dt[!is.na(as.numeric(dt$degree)), risks_best := min(risks_oracle), by = c("lrnr")]
-  dt[is.na(as.numeric(dt$degree)), risks_best := risks_oracle, by = c("lrnr")]
-  dt$type[!is.na(as.numeric(dt$degree))] <- "sieve"
-  dt$type[is.na(as.numeric(dt$degree))] <- dt$degree[is.na(as.numeric(dt$degree))]
-
-  dt2 <- dt[,c("lrnr", "risks_best", "type"), with = F]
-  dt2 <- unique(dt2)
-  dt2$n <- n
-  return(dt2)
-})
-
-
-dt <- rbindlist(sims_list)
-dt <- dt[dt$lrnr != "subst"]
-dt <- dt[dt$lrnr != "causalforest"]
-
-plt <- ggplot(dt[!(dt$lrnr %in% c("glm", "earth", "gam3", "gam4", "gam5")),], aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
-  facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE")
-ggsave("performancePlotSieveForest2.pdf")
-plt
