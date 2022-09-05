@@ -57,14 +57,12 @@ outcome_function_plugin_LRR <- function(A, Y, EY1W, EY0W, pA1W) {
   #print("outcome plugin")
 
 
-  #print(quantile((EY1W  / (EY1W + EY0W))))
   EY1W  / (EY1W + EY0W)
 }
 #' @export
 weight_function_plugin_LRR <- function(A, Y, EY1W, EY0W, pA1W) {
   (EY1W + EY0W)
-  #print("weight")
-  #print(quantile((  (EY1W + EY0W))))
+
   (EY1W + EY0W)
 }
 #' @export
@@ -97,10 +95,10 @@ weight_function_sieve_IPW_LRR <- function(A , Y, EY1W , EY0W , pA1W ){
 }
 
 #' @export
-efficient_loss_function_LRR <- function(theta, A , Y, EY1W , EY0W , pA1W){
+efficient_loss_function_LRR <- function(theta, A , Y, EY1W , EY0W , pA1W,...){
   LRR <- theta
   EY <- ifelse(A==1, EY1W, EY0W)
   plugin_risk <- (EY0W + EY1W) * log(1 + exp(LRR)) - EY1W * LRR
-  score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR)) - LRR)*(Y - EY)
-  plugin_risk + score_comp
+  score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR))  )*(Y - EY)
+  as.matrix((plugin_risk + score_comp))
 }

@@ -56,12 +56,14 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
   }
   all_ERM_full_predictions <- do.call(cbind, lapply(all_ERM_full_best, `[[`, "ERM_pred"))
   output_list <- list(learners = all_ERM_full_best, pA1W = pA1W, EY1W = EY1W, EY0W = EY0W, learner_names = learner_names)
+
   if(cross_validate_ERM) {
 
     learners_all_folds <- lapply(folds, train_learners_using_fold, V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = V )
     names(learners_all_folds) <- seq_along(folds)
     learners_all_folds <- unlist(learners_all_folds)
     learner_sieve_names <- names(learners_all_folds)
+    #print(learner_sieve_names)
     learners_all_folds_delayed <- bundle_delayed(learners_all_folds)
     print("HERE")
 
@@ -81,16 +83,21 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
       })
       names(learners_best_sieve_all_folds) <- seq_along(folds)
     }
+   # print( names(learners_best_sieve_all_folds))
+    #print( names(full_fit_ERM))
     cv_predictions <- cv_predict_learner(folds, learners_best_sieve_all_folds)
-    print(dim(cv_predictions))
+    #cv_predictions <- apply(cv_predictions,2,transform_function)
+    #print(head(cv_predictions))
+    names(cv_predictions) <- names(full_fit_ERM)
     best_learner_index_cv <- which.min(efficient_risk_function(cv_predictions, A , Y, EY1W, EY0W, pA1W, weights, efficient_loss_function))
 
     all_ERM_full_predictions <- all_ERM_full_predictions[,best_learner_index_cv]
     output_list$learners_best_sieve_all_folds <- learners_best_sieve_all_folds
     output_list$cv_index <- best_learner_index_cv
     output_list$cv_predictions <- cv_predictions
+    output_list$lrnr_names <-  names(full_fit_ERM)
   }
-
+  output_list$transform_function <- transform_function
   return(output_list)
 
 
@@ -124,6 +131,8 @@ predict <- function(output, Wpred, subset_cv = TRUE) {
     preds <- preds[, cv_index]
   }
 
+  transform_function <- output$transform_function
+  preds <- apply(preds, 2, transform_function)
   return(preds)
 }
 

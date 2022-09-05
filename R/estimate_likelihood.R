@@ -38,9 +38,10 @@ estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1
   #}
   pA1W <- sl3_Learner_pA1W_trained$predict(task_pA1W)
   pA1W <- pmax(pmin(pA1W, 0.995), 0.005)
-  if(any(EY != ifelse(A==1, EY1W, EY0W))) {
-    stop("EY and EY1W, EY0W are inconsistent.")
-  }
+ # if(any(EY != ifelse(A==1, EY1W, EY0W))) {
+  #  print(data.table(A, EY, EY1W, EY0W))
+   # stop("EY and EY1W, EY0W are inconsistent.")
+#  }
 
 
   internal <-  list(task_pA1W = task_pA1W, task_EY = task_EY, sl3_Learner_pA1W_trained = sl3_Learner_pA1W_trained, sl3_Learner_EYAW_trained = sl3_Learner_EYAW_trained, folds = folds)

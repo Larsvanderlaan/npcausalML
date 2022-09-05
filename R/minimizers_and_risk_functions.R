@@ -36,7 +36,9 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
     params <- sl3_Learner$params
     params$family <- family_risk_function
     sl3_Learner <- sl3_Learner$clone()$reparameterize(params)
-    task_ERM <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights")
+    outcome_type <- NULL
+
+    task_ERM <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights", outcome_type = outcome_type)
     if(task_ERM$outcome_type$type %in% c("constant", "categorical")) {
       task_ERM <- sl3_Task$new(data, covariates = covariates, outcome = "pseudo_outcome", weights = "pseudo_weights", outcome_type = "continuous")
     }
@@ -45,6 +47,7 @@ estimate_using_ERM <- function(V, A, Y,  EY1W, EY0W, pA1W, weights, family_risk_
 
   }
   else if(learning_method == "IPW") {
+    sl3_Learner <- Lrnr_mean$new()
     pseudo_outcome <- outcome_function_IPW(A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
     pseudo_weights <- weights * weight_function_IPW(A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
     data$pseudo_outcome <- pseudo_outcome
@@ -95,7 +98,7 @@ efficient_risk_function <- function(theta, A, Y, EY1W, EY0W, pA1W, weights, effi
   #EY <- ifelse(A==1, EY1W, EY0W)
   #plugin_risk <- (EY0W + EY1W) * log(1 + exp(LRR)) - EY1W * LRR
   #score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR)) - LRR)*(Y - EY)
-  DR_loss <- weights*apply(as.matrix(LRR), 2, efficient_loss_function, V = V, A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W, oracle = oracle)
+  DR_loss <- weights*apply(as.matrix(LRR), 2, efficient_loss_function, V = V, A = A, Y = Y, EY1W = EY1W, EY0W = EY0W, pA1W = pA1W)
   if(debug){
     #print(colMeans(weights * score_comp))
   }
