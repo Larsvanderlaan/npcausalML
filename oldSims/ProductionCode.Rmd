@@ -1,0 +1,173 @@
+---
+title: "RR"
+output: html_document
+date: '2022-03-01'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Code design
+
+```{r}
+# Mock data
+n <- 500
+W1 <- runif(n, -1 , 1)
+W2 <- rbinom(n, 1 , plogis(W1))
+W <- cbind(W1, W2)
+A <- rbinom(n, 1 , plogis(W1 + W2 - 0.5))
+Y <- rbinom(n, 1, plogis(-2 + W1 + W2 + A*(1 + W1 + W2)))
+R <- as.numeric(1:n %in% c(which(Y==1), which(Y==0)[rbinom(sum(Y==0), size = 1, prob = 0.5)==1]))
+weights <- R/ifelse(Y==1, 1, 0.5)
+
+keep <- R!=0
+W <- W[keep,]
+A <- A[keep]
+Y <- Y[keep]
+weights <- weights[keep]
+
+lrnr <- Lrnr_glmnet$new(formula = ~.^2)
+likelihood <- estimate_initial_likelihood(W, A, Y, weights, lrnr, lrnr)
+
+data <- data.table(W)
+covariates <- colnames(W)
+data$Z <- runif(nrow(data))
+task <- sl3_Task$new(data, covariates = covariates, outcome = "Z",  outcome_type = "binomial")
+
+
+```
+
+ 
+
+
+```{r, include = T}
+library(sl3)
+library(data.table)
+library(delayed)
+library(stringr)
+library(origami)
+n <- 2500
+W1 <- runif(n, -1 , 1)
+W2 <- runif(n, -1 , 1)# rbinom(n, 1 , plogis(W1))
+W <- cbind(W1, W2)
+A <- rbinom(n, 1 , plogis(0.5*(W1 + W2 )))
+Y <- rbinom(n, 1, plogis(-1 + W1 + W2 + A*(1 + W1 + W2)))
+LRR <- log(plogis(-1 + W1 + W2 + 1*(1 + W1 + W2)) / plogis(-1 + W1 + W2 + 0*(1 + W1 + W2)))
+           
+R <- as.numeric(1:n %in% c(which(Y==1), which(Y==0)[rbinom(sum(Y==0), size = 1, prob = 0.5)==1]))
+
+pR0 <- mean(R[Y==0])
+pR1 <- mean(R[Y==1])
+weights <- R / ifelse(Y==1, pR1, pR0)
+
+keep <- R!=0
+W <- W[keep,]
+A <- A[keep]
+Y <- Y[keep]
+weights <- weights[keep]
+LRR <- LRR[keep]
+lrnr <- make_learner(Pipeline, Lrnr_cv$new(Stack$new(Lrnr_xgboost$new(max_depth = 5), Lrnr_xgboost$new(max_depth = 4), Lrnr_xgboost$new(max_depth = 3))), Lrnr_cv_selector$new(loss_loglik_binomial))
+
+lrnr <- Lrnr_hal9001$new(max_degree = 2, smoothness_orders = 1, num_knots = c(2,1))
+likelihood <- estimate_initial_likelihood(W, A, Y, weights, lrnr, lrnr)
+lrnr <- Lrnr_glm$new(formula = ~.^2)
+EY1 <- likelihood$EY1
+EY0 <- likelihood$EY0
+pA1 <- likelihood$pA1
+data.table(EY1, plogis(-1 + W[,1] + W[,2] + 1*(1 + W[,1] + W[,2])),
+           EY0,  
+           plogis(-1 + W[,1] + W[,2] + 0*(1 + W[,1] + W[,2])))
+
+(data.table(EY1/EY0, exp(LRR)[R!=0]))
+
+pred <- estimate_LRR_using_ERM(W, A, Y,  EY1, EY0, pA1, weights,  Lrnr_glm$new(family = binomial()), learning_method = c("plugin"))
+quantile(exp(pred$LRR_train))
+
+pred <- estimate_LRR_using_ERM(W, A, Y,  EY1, EY0, pA1, weights,  Lrnr_glm$new(family = binomial()), learning_method = c("IPW"))
+quantile(exp(pred$LRR_train))
+
+
+ 
+```
+
+```{r, include = F}
+# 3 additive/main-term sieves up to order 3
+list_of_sieves <- list(
+  NULL,
+   fourier_basis$new(orders = c(1,0)),
+   fourier_basis$new(orders = c(2,0)),
+   fourier_basis$new(orders = c(1,1)),
+  fourier_basis$new(orders = c(2,1))
+)
+list_of_learners <- list(
+   Lrnr_gam$new(family = binomial()) ,
+  #Lrnr_xgboost$new(max_depth = 5, objective = "reg:logistic" ),
+  Lrnr_hal9001$new(max_degree = 2, smoothness_orders = 1, num_knots = c(8,5), lambda = c(0.0005, 0.01), fit_control = list(cv_select = FALSE) , family = binomial())
+)
+learner_names <- sapply(list_of_learners, `[[`, "name")
+
+
+full_fit_LRR <- train_LRR_learners(V=W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves, Vpred = W) 
+all_LRR_full_best <- subset_best_sieve(full_fit_LRR, learner_names, A, Y, EY1, EY0, pA1, weights)
+#all_LRR_full <- do.call(cbind, lapply(full_fit_LRR, `[[`, "LRR_train"))
+
+#list_of_learners <- list(Lrnr_glm$new(family = binomial()))
+folds <- origami::make_folds(n=length(A))
+
+ 
+ 
+
+LRR_learners_by_fold <- lapply(folds, train_LRR_learners_using_fold,   W, A, Y, EY1, EY0, pA1, weights, list_of_learners, list_of_sieves )
+names(LRR_learners_by_fold) <- seq_along(folds)
+LRR_learners_by_fold <- unlist(LRR_learners_by_fold)
+learner_sieve_names <- names(LRR_learners_by_fold)
+LRR_learners_by_fold_delayed <- bundle_delayed(LRR_learners_by_fold)
+LRR_learners_by_fold <- LRR_learners_by_fold_delayed$compute()
+ 
+#names(LRR_learners_by_fold) <- learner_sieve_names
+```
+
+
+
+ 
+
+
+```{r, include = F}
+ 
+output <- subset_best_sieve_all_folds(folds, LRR_learners_by_fold, learner_names, A, Y, EY1, EY0, pA1, weights) 
+
+
+ 
+cv_fun <- function(fold) {
+   fold_number <- fold_index()
+    index <- validation()
+  v <- origami::fold_index(fold = fold)
+  list(index = index,
+          fold_index = rep(fold_index(), length(index)), predictions=as.data.table(do.call(cbind, lapply(output[[v]] , `[[`, "LRR_pred"))))
+}
+ comb_ctrl <- list(combiners = list(
+        index = combiner_c, fold_index = combiner_c,
+        predictions = function(x) rbindlist(x, fill = TRUE)
+      ))
+cv_predictions <- origami::cross_validate(cv_fun, folds, .combine_control = comb_ctrl)
+cv_predictions <- as.matrix(cv_predictions$predictions[order(cv_predictions$index),] )
+best_learner_index_cv <- which.min(DR_risk_function_LRR(cv_predictions, A , Y, EY1, EY0, pA1, weights))
+ 
+```
+
+```{r}
+ best_learner_index_cv
+DR_risk_function_LRR(cv_predictions, A , Y, EY1, EY0, pA1, weights)
+tmp <- lapply(all_LRR_full_best, `[[`, "LRR_pred")
+tmp_names <-  names(all_LRR_full_best)
+all_LRR_full_predictions <- do.call(cbind, tmp)
+colnames
+dim(all_LRR_full_predictions)
+dim(cv_predictions)
+  
+```
+
+
+
