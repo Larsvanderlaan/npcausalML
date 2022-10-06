@@ -1,0 +1,260 @@
+---
+title: "intro"
+output: html_document
+date: '2022-09-27'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+n = 300
+W <- rcauchy(n, scale = 0.25)
+pi0 <- plogis(W)
+hist(pi0)
+quantile(pi0)
+```
+
+
+```{r}
+
+set.seed(12345)
+library(sl3)
+n = 5000
+W1 <- rt(n, df = 7)
+pi0 <- plogis(2*W1 )
+ 
+A <- rbinom(n, 1, pi0)
+mu0 = plogis( W1-2)
+mu1 <- plogis(2*W1+2)
+mu <- ifelse(A==1, mu1, mu0)
+Y <- rbinom(n, 1, mu)
+ 
+ zeta0 <- mu1 - mu0 + (2*A-1) / ifelse(A==1, pi0, 1-pi0) * (Y-mu)
+data_big <- data.frame(W1, A, Y, zeta0, CATE = mu1 - mu0)
+```
+
+
+```{r}
+set.seed(12345)
+library(sl3)
+n = 1500
+W1 <- rt(n, df = 7)
+pi0 <- plogis(2*W1  )
+ 
+A <- rbinom(n, 1, pi0)
+mu0 = plogis( W1-2)
+mu1 <- plogis(2*W1+2)
+mu <- ifelse(A==1, mu1, mu0)
+Y <- rbinom(n, 1, mu)
+ trueCATE <- mu1 - mu0
+ 
+lrnr <- Lrnr_sl$new(list(
+   Lrnr_ranger$new(max.depth = 3, min.node.size =25)), metalearner= Lrnr_cv_selector$new())
+
+data <- as.data.frame(cbind(W1,A,Y))
+ taskY <- sl3_Task$new(data, c("W1"), "Y")
+  taskA <- sl3_Task$new(data, c("W1"), "A")
+  lrnr_Y1 <- lrnr$train(taskY[A==1])
+    lrnr_Y0 <- lrnr$train(taskY[A==0])
+mu1 <- lrnr_Y1$predict_fold(taskY, "validation")
+ mu0 <- lrnr_Y0$predict_fold(taskY, "validation")
+ pi0 <- lrnr$train(taskA)$predict_fold(taskA, "validation")
+mu <-  ifelse(A==1, mu1, mu0)
+
+task_big <- sl3_Task$new(data_big, c("W1" ), "zeta0")
+CATE_T <- lrnr_Y1$predict(task_big) -  lrnr_Y0$predict(task_big)
+ 
+
+
+ X <- (2*A-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1) , sin(3*W1) , cos(3*W1),  sin(4*W1) , cos(4*W1))
+ colnames(X) <- paste0("W", seq_len(ncol(X)))
+  X1 <- (2*1-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1) , sin(3*W1) , cos(3*W1),  sin(4*W1) , cos(4*W1))
+ colnames(X1) <- paste0("W", seq_len(ncol(X)))
+  X0 <- (2*0-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1) , sin(3*W1) , cos(3*W1),  sin(4*W1) , cos(4*W1))
+ colnames(X0) <- paste0("W", seq_len(ncol(X)))
+data <- data.frame(W1,A,Y, mu, weights =  1 / ifelse(A==1, pi0, 1 - pi0))
+data1 <- data.frame(W1,A=1,Y, mu=mu1, weights =  1 / ifelse(A==1, pi0, 1 - pi0))
+data0 <- data.frame(W1,A=0,Y, mu=mu0, weights =  1 / ifelse(A==1, pi0, 1 - pi0))
+data <- cbind(data, as.data.frame(X))
+data0 <- cbind(data0, as.data.frame(X0))
+data1 <- cbind(data1, as.data.frame(X1))
+taskY0 <- sl3_Task$new(data0, c(colnames(X), "A"), "Y", weights = "weights", offset = "mu")
+taskY1 <- sl3_Task$new(data1, c(colnames(X), "A" ), "Y", weights = "weights", offset = "mu")
+
+taskY <- sl3_Task$new(data, c(colnames(X), "A" ), "Y", weights = "weights", offset = "mu")
+ 
+lrnr <- Lrnr_glm$new( family = gaussian())
+lrnr <- lrnr$train(taskY)
+mu0n <-  lrnr$predict(taskY0)
+mu1n <- lrnr$predict(taskY1)
+mun <- ifelse(A==1, mu1n, mu0n)
+ 
+ 
+
+
+
+colMeans( X/ ifelse(A==1, pi0, 1 - pi0) * (Y - mun))
+mean( A/ ifelse(A==1, pi0, 1 - pi0) * (Y - mun))
+
+EP_outcome <- mu1n - mu0n
+ 
+
+ 
+
+ zeta0 <- mu1 - mu0 + (2*A-1) / ifelse(A==1, pi0, 1-pi0) * (Y-mu)
+data <- data.frame(W1, zeta0, EP_outcome)
+bins <- findInterval(W1, quantile(W1, seq(0,1,length = n/50)), all.inside = TRUE)
+ 
+data$bins <- bins
+data_big$bins <-   findInterval(data_big$W1, quantile(W1, seq(0,1,length = n/50)), all.inside = TRUE)
+task <- sl3_Task$new(data, c("W1", "bins"), "zeta0")
+task_big <- sl3_Task$new(data_big, c("W1", "bins"), "zeta0")
+lrnr <- Lrnr_stratified$new(Lrnr_mean$new(), "bins")
+
+task <- sl3_Task$new(data, c("W1" ), "zeta0")
+task_big <- sl3_Task$new(data_big, c("W1" ), "zeta0")
+lrnr <- Lrnr_sl$new(list( 
+   Lrnr_xgboost$new(max_depth = 2, nrounds = 1),
+                         Lrnr_xgboost$new(max_depth = 3, nrounds = 1),
+                         Lrnr_xgboost$new(max_depth = 4, nrounds = 1),
+                          Lrnr_xgboost$new(max_depth = 5, nrounds = 1)
+                         ), metalearner = Lrnr_cv_selector$new())
+ lrnr <-  Lrnr_xgboost$new(max_depth =3, nrounds = 20)
+
+CATE_hist <- lrnr$train(task)$predict(task_big)
+ 
+
+ task <- sl3_Task$new(data, c("W1" ), "EP_outcome")
+#lrnr <- Lrnr_stratified$new(Lrnr_mean$new(), "bins")
+ #lrnr <-  Lrnr_xgboost$new(max_depth =3, nrounds = 20)
+CATE_hist_EP <- lrnr$train(task)$predict(task_big)
+
+
+
+ 
+library(ggplot2)
+ 
+set.seed(12345)
+task <- sl3_Task$new(data, c("W1"), "zeta0")
+task_big <- sl3_Task$new(data_big, c("W1", "bins"), "zeta0")
+
+lrnr <- Lrnr_ranger$new(max.depth = 3, min.node.size =25) #, min.node.size =25)
+ 
+CATE_rf <- lrnr$train(task)$predict(task)
+plot(task$X[[1]], CATE_rf)
+
+set.seed(12345)
+task <- sl3_Task$new(data, c("W1"), "zeta0")
+task_big <- sl3_Task$new(data_big, c("W1", "bins"), "zeta0")
+
+#lrnr <- Lrnr_ranger$new(max.decpth = 3, min.node.size =300) #, min.node.size =25)
+library(ranger)
+fit <-  ranger(   x = data.frame(W1=data$W1), y = zeta0, max.depth = 3, min.node.size = 30, num.trees=2000)
+CATE_rf <- predict(fit, data =  data.frame(W1=data_big$W1))$predictions
+ 
+plot(data_big$W1, CATE_rf)
+
+
+ 
+ 
+fit <-  ranger(   x = data.frame(W1=data$W1), y = EP_outcome, max.depth = 3, min.node.size = 30, num.trees=2000)
+CATE_EP_rf <- predict(fit, data =  data.frame(W1=data_big$W1))$predictions
+ plot(data_big$W1, CATE_EP_rf)
+
+
+ 
+
+
+data <- rbind(data.frame(Method = "DR-learner", Learner = "Histogram", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_hist ),
+              data.frame(Method = "DR-learner", Learner = "Random forests", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_rf ),
+              
+              data.frame(Method = "EP-learner",  Learner = "Histogram", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_hist_EP),
+                data.frame(Method = "EP-learner", Learner = "Random forests", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_EP_rf) 
+)
+
+ 
+ggplot(data)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.5,5),-1.5), color = Method, linetype = Method ) )   + scale_x_continuous(limits=c(-3,3)) + labs(x = "W", y = "CATE")  +  geom_line(aes(x = X, y = CATE_true ), color = "black", alpha = 0.4 )+ scale_y_continuous(limits = c(-1.5, 1.5) ) + theme_bw() + facet_grid(~ Learner)+ facet_grid(~ Learner)+ scale_colour_manual(values = c("red", "blue")) 
+ggsave(file = "boundViol.pdf")
+
+
+
+data <- rbind( 
+              data.frame(Method = "EP-learner",  Learner = "Histogram", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_hist_EP),
+                data.frame(Method = "EP-learner", Learner = "Random forests", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_EP_rf),
+              data.frame(Method = "T-learner", Learner = "Histogram", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est =CATE_T  ),
+              data.frame(Method = "T-learner", Learner = "Random forests", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_T )
+)
+
+ 
+ggplot(data)   + geom_line(aes(x = X, y = CATE_est, color = Method, linetype = Method ) )   + scale_x_continuous(limits=c(-3,3)) + labs(x = "W", y = "CATE")  +  geom_line(aes(x = X, y = CATE_true ), color = "black", alpha = 0.4 )+ theme_bw() + facet_grid(~ Learner)+ facet_grid(~ Learner)+ scale_colour_manual(values = c("blue", "red")) 
+ggsave(file = "boundViol_T.pdf")
+
+
+# ggplot(data) + geom_line( aes(x=X, y = AIPW_strat, color = "DR-learner: Binned")) +
+#   geom_line(aes(y = CATE_rf, x = X, color = "DR-learner: random forests")) + 
+#   geom_smooth(aes(x = X, y = CATE, color = "Truth") )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "W", y = "CATE") + scale_y_continuous(limits = c(-1.5, 2) ) +  scale_colour_manual("", 
+#                       breaks = c("DR-learner: Binned", "DR-learner: random forests", "True CATE"),
+#                       values = c("red",   "blue", "black")) + theme_bw()  
+# 
+# ggplot(data.frame(X=data$W1,Y = data$zeta0), aes(x= Y)) + geom_histogram()  + theme_bw() +scale_x_continuous(breaks = seq(-6,6,1)) + labs(x = "Oracle pseudo-outcome for DR-learner")
+
+
+
+ggsave(file = "boundViolHistogramOutcome.pdf")
+```
+
+```{r}
+plot(W1, CATE)
+plot(W1[CATE<=1 & CATE>=0], CATE[CATE<=1 & CATE>=0])
+keep <-  A==1 & pi0  <= 0.2
+sum(keep)
+ 
+ sum(zeta0[keep]) / sum(keep)
+
+ 
+quantile(CATE)
+```
+
+
+
+```{r}
+library(sl3)
+n = 1500
+W1 <- rt(n, df = 7)
+W2 <- runif(n, -1 ,1)
+pi0 <- plogis(2*W1*sin(5*W2))
+hist(pi0)
+A <- rbinom(n, 1, pi0)
+mu0 = plogis( W2-1)
+mu1 <- plogis(2*W2+1)
+mu <- ifelse(A==1, mu1, mu0)
+Y <- rbinom(n, 1, mu)
+data <- data.frame(W1,W2,A ,Y)
+lrnr <- Lrnr_cv$new(Stack$new(Lrnr_xgboost$new(max_depth = 3, nrounds = 20), Lrnr_xgboost$new(max_depth = 4, nrounds = 20), Lrnr_xgboost$new(max_depth = 5, nrounds = 20)))
+lrnr <- make_learner(Pipeline, lrnr, Lrnr_cv_selector$new())
+lrnr <- Lrnr_ranger$new(max_depth = 10)
+task_A <- sl3_Task$new(data, c("W1", "W2"), "A")
+task_Y <- sl3_Task$new(data, c("W1", "W2", "A"), "Y")
+data1 <- data0 <- data
+data1$A <- 1; data0$A <- 0
+task_Y1 <- sl3_Task$new(data1, c("W1", "W2", "A"), "Y")
+task_Y0 <- sl3_Task$new(data0, c("W1", "W2", "A"), "Y")
+
+pin <- lrnr$train(task_A)$predict(task_A)
+mun <- lrnr$train(task_Y)$predict(task_Y)
+mu1n <- lrnr$train(task_Y)$predict(task_Y1)
+mu0n <- lrnr$train(task_Y)$predict(task_Y0)
+ 
+zetan <- mu1n - mu0n + (2*A-1) / ifelse(A==1, pin, 1-pin) * (Y-mun)
+zeta0 <- mu1 - mu0 + (2*A-1) / ifelse(A==1, pi0, 1-pi0) * (Y-mu)
+
+keep <-  A==1 & pi0  <= 0.2
+sum(keep)
+sum(zetan[keep]) / sum(keep)
+ sum(zeta0[keep]) / sum(keep)
+
+quantile(pin)
+```
