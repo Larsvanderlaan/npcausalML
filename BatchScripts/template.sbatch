@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name LarsJob%j        # Set a name for your job. This is especially useful if you have multiple jobs queued.
+#SBATCH --job-name LarsJob%jls        # Set a name for your job. This is especially useful if you have multiple jobs queued.
 #SBATCH --partition medium       # Slurm partition to use
 #SBATCH --ntasks 20            # Number of tasks to run. By default, one CPU core will be allocated per task
 #SBATCH --time 10-00:00          # Wall time limit in D-HH:MM
@@ -10,4 +10,4 @@
 #SBATCH --mail-user=lvdlaan@uw.edu # Email to which notifications will be sent
 
 module load R
-R CMD BATCH ../FinalSimulationCode/$filename.R
+R CMD BATCH ../FinalSimulationCode/test.R
