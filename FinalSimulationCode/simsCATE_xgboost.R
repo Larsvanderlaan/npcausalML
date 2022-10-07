@@ -1,5 +1,5 @@
 library(SuperLearner)
-#library(npcausalML)
+library(npcausalML)
 library(future)
 plan(cluster, workers = 3)
 source("./FinalSimulationCode/simCATE.R")
