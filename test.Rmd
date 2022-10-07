@@ -1,0 +1,36 @@
+---
+title: "test"
+output: html_document
+date: '2022-10-06'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+set.seed(123)
+n <- 500
+X <- runif(n, -1,1)
+pi <- plogis(2*X)
+A <- rbinom(n, 1, pi)
+mu <- X + A * (1 + X)
+mu1 <- 1 + 2*X
+mu0 <- X
+Y <- rnorm(n, mu, 0.5)
+
+t <- Sys.time()
+ plan(multiprocess,workers=1)
+
+out <- EP_learn(list( Lrnr_xgboost$new(max_depth = 1, verbosity=0), Lrnr_xgboost$new(max_depth = 5, verbosity=0),Lrnr_xgboost$new(max_depth = 7),Lrnr_xgboost$new(max_depth = 3, verbosity=0), Lrnr_xgboost$new(max_depth = 10, verbosity=0)),
+                V = data.frame(X=X), A = A, Y = Y, EY1W = mu1  , EY0W = mu0  , pA1W = pi, sieve_basis_generator_list = list(NULL, fourier_basis$new(1,1),fourier_basis$new(2,1) ) ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE) 
+
+ print(  Sys.time() - t)
+ 
+ 
+out$cv_predictions
+
+out$full_predictions
+  
+```

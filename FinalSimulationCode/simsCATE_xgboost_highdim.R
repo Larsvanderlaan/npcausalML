@@ -1,6 +1,7 @@
 library(SuperLearner)
 library(npcausalML)
 library(future)
+plan(multiprocess, workers = 8)
 source("./FinalSimulationCode/simCATEHighDim.R")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
@@ -67,6 +68,7 @@ onesim <- function(n) {
       Lrnr_xgboost$new(max_depth =3),
       Lrnr_xgboost$new(max_depth =4),
       Lrnr_xgboost$new(max_depth =5),
+      Lrnr_xgboost$new(max_depth =6),
       lrnr_gam2,   lrnr_gam5), "A"))
     , Lrnr_cv_selector$new(loss_squared_error))
 
@@ -76,6 +78,7 @@ onesim <- function(n) {
       Lrnr_xgboost$new(max_depth =3),
       Lrnr_xgboost$new(max_depth =4),
       Lrnr_xgboost$new(max_depth =5),
+      Lrnr_xgboost$new(max_depth =6),
       lrnr_gam2,   lrnr_gam5)
   )
   , Lrnr_cv_selector$new(loss_squared_error))
@@ -106,13 +109,13 @@ onesim <- function(n) {
 
 
   lrnr_rf <- list(Lrnr_ranger$new(
-    max.depth = 5, name = "Lrnr_rf_5_xg"),
+    max.depth = 3, name = "Lrnr_rf_3_xg"),
+    Lrnr_ranger$new(
+      max.depth = 5, name = "Lrnr_rf_5_xg"),
     Lrnr_ranger$new(
       max.depth = 7, name = "Lrnr_rf_7_xg"),
     Lrnr_ranger$new(
-      max.depth = 9, name = "Lrnr_rf_9_xg"),
-    Lrnr_ranger$new(
-      max.depth = 11, name = "Lrnr_rf_11_xg"))
+      max.depth = 9, name = "Lrnr_rf_9_xg"))
 
   lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error))
 
@@ -137,29 +140,16 @@ onesim <- function(n) {
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
 
 
-
-  fit_npcausalML <- npcausalML(CATE_library,
-                               W= W, A = A, Y = Y, V = as.data.frame(W),
-                               EY1W = EY1W_est, EY0W = EY0W_est,  pA1W = pA1W_est,
-                               sl3_Learner_EYAW = NULL, sl3_Learner_pA1W = NULL, outcome_type = "continuous", list_of_sieves = list_of_sieves_high_dim,
-                               outcome_function_plugin = outcome_function_plugin_CATE, weight_function_plugin = weight_function_plugin_CATE,
-                               outcome_function_IPW = outcome_function_IPW_CATE, weight_function_IPW = weight_function_IPW_CATE,
-                               design_function_sieve_plugin = design_function_sieve_plugin_CATE,
-                               weight_function_sieve_plugin = weight_function_sieve_plugin_CATE,
-                               design_function_sieve_IPW = design_function_sieve_IPW_CATE, weight_function_sieve_IPW = weight_function_sieve_IPW_CATE, transform_function = function(x){x},
-                               family_risk_function = gaussian(),
-                               efficient_loss_function = efficient_loss_function_CATE,
-                               use_sieve_selector = FALSE,
-                               cross_validate_ERM = T, folds = origami::folds_vfold(length(A), 5))
+  fit_npcausalML <- EP_learn(CATE_library,V = as.data.frame(W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = list_of_sieves_high_dim ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
 
 
-  preds <- predict(fit_npcausalML,  as.data.frame(W), F)
+  preds <- fit_npcausalML$full_predictions
 
 
   # Compute least-squares risk of predictions using oracle loss function.
   risks_oracle <- as.vector(apply(preds, 2, function(theta) {
     mean((theta -  CATE)^2)
-  })[grep("plugin", colnames(preds))])
+  }) )
 
   # Compute estimated cross-validated one-step risk of predictions
   cvrisksDR <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {
@@ -174,8 +164,8 @@ onesim <- function(n) {
     mean(loss)
   }))#[-grep("IPW", colnames(fit_npcausalML$cv_predictions))])
   lrnrs_full <-  colnames(fit_npcausalML$cv_predictions)
-  lrnrs <- gsub("[._]fourier.+", "", lrnrs_full)
-  lrnrs <- gsub("[._]no_sieve.+", "", lrnrs)
+  lrnrs <- gsub("[._]sieve_fourier.+", "", lrnrs_full)
+  lrnrs <- gsub("_no_sieve", "", lrnrs)
   degree <- as.numeric(stringr::str_match(lrnrs_full, "fourier_basis_([0-9]+)")[,2])
   degree[grep("no_sieve", lrnrs_full)] <- 0
 

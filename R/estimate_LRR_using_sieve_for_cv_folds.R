@@ -62,11 +62,15 @@ subset_best_sieve_all_folds <- function(folds, trained_learner_list, learner_nam
 
 
 cv_predict_learner <- function(folds, learners_all_folds) {
+
+  #print(length(learners_all_folds[[1]][[1]]))
   cv_fun <- function(fold) {
+    print("IN")
     fold_number <- fold_index()
     index <- validation()
     preds <- as.data.table(do.call(cbind, lapply(learners_all_folds[[fold_number]] , `[[`, "ERM_pred")))
     colnames(preds) <- gsub("[0-9]+[.]", "", names(learners_all_folds[[fold_number]]))
+    print("OUT")
     list(index = index,
          fold_index = rep(fold_number, length(index)), predictions= preds)
   }
@@ -74,6 +78,7 @@ cv_predict_learner <- function(folds, learners_all_folds) {
     index = combiner_c, fold_index = combiner_c,
     predictions = function(x) rbindlist(x)
   ))
-  cv_predictions <- origami::cross_validate(cv_fun, folds, .combine_control = comb_ctrl)
+
+  cv_predictions <- origami::cross_validate(cv_fun, folds, .combine_control = comb_ctrl, cross_validate = FALSE)
   cv_predictions <- as.matrix(cv_predictions$predictions[order(cv_predictions$index),] )
 }

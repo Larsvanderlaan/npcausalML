@@ -102,3 +102,9 @@ efficient_loss_function_LRR <- function(theta, A , Y, EY1W , EY0W , pA1W,...){
   score_comp <- (A/pA1W)*(log(1 + exp(LRR)) - LRR)*(Y - EY) + ((1-A)/(1-pA1W))*(log(1 + exp(LRR))  )*(Y - EY)
   as.matrix((plugin_risk + score_comp))
 }
+
+
+
+
+EP_learner_spec_CATE <- list(efficient_loss_function = efficient_loss_function_CATE, outcome_type = "continuous", sieve_design_transform = design_function_sieve_plugin_CATE, sieve_weight_transform  = weight_function_sieve_plugin_CATE, EP_family = gaussian(), EP_outcome_transform = outcome_function_plugin_CATE, EP_weight_transform = weight_function_plugin_CATE)
+

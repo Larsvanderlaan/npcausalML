@@ -1,0 +1,5 @@
+#devtools::install_github("tlverse/sl3")
+#try({devtools::install_github("tlverse/hal9001")})
+#try({devtools::install_github("tlverse/origami")})
+devtools::install_cran("fda")
+try({devtools::install_github("Larsvanderlaan/npcausalML")})

@@ -109,3 +109,5 @@ efficient_risk_function <- function(theta, A, Y, EY1W, EY0W, pA1W, weights, effi
     return(colMeans(DR_loss))
   }
 }
+
+

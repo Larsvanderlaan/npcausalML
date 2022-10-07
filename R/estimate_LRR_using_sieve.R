@@ -58,7 +58,7 @@ train_learners <- function(V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_funct
   learner_names <- names(list_of_learners)
   names(all_learners_delayed) <- paste0(learner_names)
   if(compute) {
-    all_learners_delayed <- bundle_delayed(unlist(all_learners_delayed))
+    all_learners_delayed <- bundle_delayed(unlist(all_learners_delayed, recursive = FALSE))
     suppressWarnings(suppressMessages(all_learners_delayed <- all_learners_delayed$compute()))
   }
   return(all_learners_delayed)

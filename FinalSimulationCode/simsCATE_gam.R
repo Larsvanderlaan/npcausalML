@@ -1,26 +1,29 @@
-library(SuperLearner)
-library(npcausalML)
-library(future)
+print("OK")
+print(.libPaths())
+
+print(getwd())
+plan(multiprocess, workers = 3)
 source("./FinalSimulationCode/simCATE.R")
+print("OK")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam2 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 2
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam4 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 4
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam5 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 5
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 list_of_sieves_uni   <- list(
   "no_sieve" = NULL,
@@ -41,7 +44,10 @@ hard <- F
 pos <- F
 
 onesim <- function(n) {
-
+  library(sl3)
+  library(SuperLearner)
+  library(npcausalML)
+  library(future)
   sieve_list <- list_of_sieves_uni
 
   data <- as.data.frame(sim.CATE(n, hard, pos))
@@ -60,6 +66,7 @@ onesim <- function(n) {
 
   # sieve method
   lrnr_Y <- make_learner(Pipeline, Lrnr_cv$new(Stack$new(
+    Lrnr_xgboost$new(max_depth =3),
     Lrnr_xgboost$new(max_depth =4),
     Lrnr_xgboost$new(max_depth =5),
     Lrnr_xgboost$new(max_depth =6)))#Stack$new(
@@ -69,6 +76,7 @@ onesim <- function(n) {
 
   lrnr_A <- make_learner(Pipeline, Lrnr_cv$new(
     Stack$new(
+      Lrnr_xgboost$new(max_depth =3),
       Lrnr_xgboost$new(max_depth =4),
       Lrnr_xgboost$new(max_depth =5),
       Lrnr_xgboost$new(max_depth =6)
@@ -110,9 +118,12 @@ onesim <- function(n) {
 
 
   subst_compare <- Stack$new(CATE_library_subst)
-  subst_compare_trained <- subst_compare$train(taskY)
-  subst_EY1W_trained <-subst_compare$train(taskY1[A==1]$next_in_chain(covariates = c("W1", "W2", "W3")))
-  subst_EY0W_trained <- subst_compare$train(taskY0[A==0]$next_in_chain(covariates = c("W1", "W2", "W3")))
+  subst_compare_trained <- delayed_learner_train(subst_compare, taskY)$compute()
+  #subst_compare_trained <- subst_compare$train(taskY)
+  subst_EY1W_trained <- delayed_learner_train(subst_compare, taskY1[A==1]$next_in_chain(covariates = c("W1", "W2", "W3")))$compute()
+  subst_EY0W_trained <- delayed_learner_train(subst_compare, taskY1[A==0]$next_in_chain(covariates = c("W1", "W2", "W3")))$compute()
+  #subst_EY1W_trained <-subst_compare$train(taskY1[A==1]$next_in_chain(covariates = c("W1", "W2", "W3")))
+  #subst_EY0W_trained <- subst_compare$train(taskY0[A==0]$next_in_chain(covariates = c("W1", "W2", "W3")))
 
   subst_EY1W <-subst_EY1W_trained$predict(taskY1$next_in_chain(covariates = c("W1", "W2", "W3")))
   subst_EY0W <- subst_EY0W_trained$predict(taskY0$next_in_chain(covariates = c("W1", "W2", "W3")))
@@ -120,30 +131,34 @@ onesim <- function(n) {
 
   # apply(subst_EY1W -subst_EY0W , 2, function(p) {mean((p - CATE)^2)})
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
+  t <- Sys.time()
+  fit_npcausalML <- EP_learn(CATE_library,V = data.frame(W1=W$W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
+  print(  Sys.time() - t)
 
-  fit_npcausalML <- npcausalML(CATE_library,
-                               W= W, A = A, Y = Y, V = data.frame(W1 = W$W1),
-                               EY1W = EY1W_est, EY0W = EY0W_est,  pA1W = pA1W_est,
-                               sl3_Learner_EYAW = NULL, sl3_Learner_pA1W = NULL, outcome_type = "continuous", list_of_sieves = sieve_list,
-                               outcome_function_plugin = outcome_function_plugin_CATE, weight_function_plugin = weight_function_plugin_CATE,
-                               outcome_function_IPW = outcome_function_IPW_CATE, weight_function_IPW = weight_function_IPW_CATE,
-                               design_function_sieve_plugin = design_function_sieve_plugin_CATE,
-                               weight_function_sieve_plugin = weight_function_sieve_plugin_CATE,
-                               design_function_sieve_IPW = design_function_sieve_IPW_CATE, weight_function_sieve_IPW = weight_function_sieve_IPW_CATE, transform_function = function(x){x},
-                               family_risk_function = gaussian(),
-                               efficient_loss_function = efficient_loss_function_CATE,
-                               use_sieve_selector = FALSE,
-                               cross_validate_ERM = T, folds = origami::folds_vfold(length(A), 5))
-
-
-  preds <- predict(fit_npcausalML,  data.frame(W1 = W$W1), F)
-
+  t <- Sys.time()
+  # fit_npcausalML <- npcausalML(CATE_library,
+  #                              W= W, A = A, Y = Y, V = data.frame(W1 = W$W1),
+  #                              EY1W = EY1W_est, EY0W = EY0W_est,  pA1W = pA1W_est,
+  #                              sl3_Learner_EYAW = NULL, sl3_Learner_pA1W = NULL, outcome_type = "continuous", list_of_sieves = sieve_list,
+  #                              outcome_function_plugin = outcome_function_plugin_CATE, weight_function_plugin = weight_function_plugin_CATE,
+  #                              outcome_function_IPW = outcome_function_IPW_CATE, weight_function_IPW = weight_function_IPW_CATE,
+  #                              design_function_sieve_plugin = design_function_sieve_plugin_CATE,
+  #                              weight_function_sieve_plugin = weight_function_sieve_plugin_CATE,
+  #                              design_function_sieve_IPW = design_function_sieve_IPW_CATE, weight_function_sieve_IPW = weight_function_sieve_IPW_CATE, transform_function = function(x){x},
+  #                              family_risk_function = gaussian(),
+  #                              efficient_loss_function = efficient_loss_function_CATE,
+  #                              use_sieve_selector = FALSE,
+  #                              cross_validate_ERM = T, folds = origami::folds_vfold(length(A), 5))
+  #
+  #
+  # print(  Sys.time() - t)
+  #preds <- predict(fit_npcausalML,  data.frame(W1 = W$W1), F)
+  preds <- fit_npcausalML$full_predictions
 
   # Compute least-squares risk of predictions using oracle loss function.
   risks_oracle <- as.vector(apply(preds, 2, function(theta) {
     mean((theta -  CATE)^2)
-  })[grep("plugin", colnames(preds))])
-
+  }) )
   # Compute estimated cross-validated one-step risk of predictions
   cvrisksDR <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {
     loss <- efficient_loss_function_CATE(W, theta, A, Y, EY1W_est,EY0W_est, pA1W_est )
@@ -157,9 +172,11 @@ onesim <- function(n) {
     mean(loss)
   }))#[-grep("IPW", colnames(fit_npcausalML$cv_predictions))])
   lrnrs_full <-  colnames(fit_npcausalML$cv_predictions)
-  lrnrs <- gsub("[._]fourier.+", "", lrnrs_full)
-  lrnrs <- gsub("[._]no_sieve.+", "", lrnrs)
-  degree <- as.numeric(stringr::str_match(lrnrs_full, "fourier_basis_([0-9]+)")[,2])
+
+   lrnrs <- gsub("[._]sieve_fourier.+", "", lrnrs_full)
+   lrnrs <- gsub("_no_sieve", "", lrnrs)
+
+   degree <- as.numeric(stringr::str_match(lrnrs_full, "fourier_basis_([0-9]+)")[,2])
   degree[grep("no_sieve", lrnrs_full)] <- 0
 
 
@@ -205,13 +222,13 @@ onesim <- function(n) {
 
   list(risk_subst_cv = risk_subst_cv,  risk_subst = risk_subst, CATEonestepbenchoracle =CATEonestepbenchoracle, CATEonestepbench = CATEonestepbench, sieve =data.frame(sieve_names, cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
-
+nsims = 10
 hard_list <- c(T,F)
 pos_list <- c(T,F)
 for(hard in hard_list) {
   for(pos in pos_list) {
 
-    nsims <- 10
+
     print(500)
     simresults500 <- lapply(1:nsims, function(i){
       print(i)

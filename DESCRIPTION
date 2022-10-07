@@ -16,7 +16,8 @@ Imports:
   stringr,
   origami,
   delayed,
-  future
+  future,
+  fda
 Depends:
   sl3,
   SuperLearner,
@@ -26,7 +27,9 @@ Depends:
   stringr,
   origami,
   delayed,
-  future
+  future,
+  xgboost,
+  fda
 Suggests:
   glmnet,
   hal9001,

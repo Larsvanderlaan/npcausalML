@@ -59,10 +59,20 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
 
   if(cross_validate_ERM) {
 
+    # learners_all_folds <- lapply(folds, function(fold)
+    #   {delayed_lrnrs <- train_learners_using_fold(fold = fold, V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = V )
+    #   print(length(delayed_lrnrs))
+    #   delayed_lrnrs <- bundle_delayed(unlist(delayed_lrnrs ))
+    #
+    #     return(delayed_lrnrs$compute(job_type = delayed::FutureJob))
+    #    })
+
     learners_all_folds <- lapply(folds, train_learners_using_fold, V, A, Y, EY1W, EY0W, pA1W, weights, family_risk_function, outcome_function_plugin, weight_function_plugin,  outcome_function_IPW, weight_function_IPW, transform_function, design_function_sieve_plugin, weight_function_sieve_plugin, design_function_sieve_IPW, weight_function_sieve_IPW, family_for_targeting,  list_of_learners, list_of_sieves, Vpred = V )
+
     names(learners_all_folds) <- seq_along(folds)
-    learners_all_folds <- unlist(learners_all_folds)
+    learners_all_folds <- unlist(learners_all_folds) # Remove rescurvei if all delayed
     learner_sieve_names <- names(learners_all_folds)
+
     #print(learner_sieve_names)
     learners_all_folds_delayed <- bundle_delayed(learners_all_folds)
     print("HERE")
@@ -85,7 +95,9 @@ npcausalML <- function(learners, W, A, Y, V = W, weights = rep(1, length(A)), Vp
     }
    # print( names(learners_best_sieve_all_folds))
     #print( names(full_fit_ERM))
+    print("CV Predicting")
     cv_predictions <- cv_predict_learner(folds, learners_best_sieve_all_folds)
+    print("CV done")
     #cv_predictions <- apply(cv_predictions,2,transform_function)
     #print(head(cv_predictions))
     names(cv_predictions) <- names(full_fit_ERM)
