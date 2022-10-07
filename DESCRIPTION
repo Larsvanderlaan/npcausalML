@@ -17,7 +17,8 @@ Imports:
   origami,
   delayed,
   future,
-  fda
+  fda,
+  earth
 Depends:
   sl3,
   SuperLearner,
@@ -29,7 +30,8 @@ Depends:
   delayed,
   future,
   xgboost,
-  fda
+  fda,
+  earth
 Suggests:
   glmnet,
   hal9001,
