@@ -10,4 +10,4 @@
 #SBATCH --mail-user=lvdlaan@uw.edu # Email to which notifications will be sent
 
 module load R
-Rscript -e 'source("~/LRRsims/BatchScripts/npcausalML/BatchScripts/R_setup.R"); source("~/LRRsims/BatchScripts/npcausalML/BatchScripts/test.R")'
+Rscript -e 'source("~/LRRsims/BatchScripts//R_setup.R"); source("~/LRRsims/BatchScripts//test.R")'
