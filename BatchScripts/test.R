@@ -3,4 +3,4 @@
 #try({devtools::install_github("tlverse/origami")})
 #devtools::install_cran("fda")
 print("HERE")
-try({devtools::install_github("Larsvanderlaan/npcausalML")})
+ devtools::install_github("Larsvanderlaan/npcausalML")
