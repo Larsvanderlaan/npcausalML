@@ -11,3 +11,4 @@
 
 module load R
 R CMD BATCH ../FinalSimulationCode/test.R
+Rscript -e 'source("R_setup.R"); source("test.R")'
