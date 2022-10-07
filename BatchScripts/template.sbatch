@@ -8,6 +8,7 @@
 #SBATCH -e ./%j.err      # File to which STDERR will be written
 #SBATCH --mail-type=NONE        # Type of email notification- NONE,BEGIN,END,FAIL,ALL
 #SBATCH --mail-user=lvdlaan@uw.edu # Email to which notifications will be sent
-
+export R_LIBS=~/Rlibs
+export R_LIBS_USER=~/Rlibs
 module load R
-Rscript -e 'source("~/LRRsims/BatchScripts//R_setup.R"); source("~/LRRsims/BatchScripts/test.R")'
+Rscript -e 'source("~/LRRsims/BatchScripts/test.R")'
