@@ -4,7 +4,7 @@ library(SuperLearner)
 library(npcausalML)
 library(future)
 print(getwd())
-plan(multiprocess, workers = 3)
+
 source("./FinalSimulationCode/simCATE.R")
 print("OK")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
