@@ -1,7 +1,7 @@
 library(SuperLearner)
 library(npcausalML)
 library(future)
-plan(multisession, workers = 3)
+plan(cluster, workers = 3)
 source("./FinalSimulationCode/simCATE.R")
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
