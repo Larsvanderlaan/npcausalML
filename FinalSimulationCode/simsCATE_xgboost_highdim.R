@@ -1,7 +1,7 @@
 library(SuperLearner)
 library(npcausalML)
 library(future)
-plan(multiprocess, workers = 8)
+plan(cluster, workers = 5)
 source("./FinalSimulationCode/simCATEHighDim.R")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1

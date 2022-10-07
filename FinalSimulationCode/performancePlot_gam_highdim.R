@@ -5,7 +5,7 @@ ns <- sort(ns)
 hard_list <-   c(T,F)
 pos_list <-  c(T,F)
 use_oracle_sieve <- F
-plan(multiprocess, workers = 5)
+plan(cluster, workers = 3)
 for(pos in pos_list){
   for(hard in hard_list) {
     try({
