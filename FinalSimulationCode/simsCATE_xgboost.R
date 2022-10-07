@@ -1,19 +1,20 @@
 library(SuperLearner)
 library(npcausalML)
 library(future)
+library(sl3)
 plan(cluster, workers = 3)
 source("./FinalSimulationCode/simCATE.R")
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam4 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 4
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam5 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 5
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 list_of_sieves_uni   <- list(
   "no_sieve" = NULL,

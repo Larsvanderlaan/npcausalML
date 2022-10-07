@@ -1,27 +1,28 @@
 library(SuperLearner)
 library(npcausalML)
 library(future)
+library(sl3)
 plan(cluster, workers = 5)
 source("./FinalSimulationCode/simCATEHighDim.R")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam2 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 2
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam4 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 4
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam5 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 5
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 
 list_of_sieves_high_dim <-   list(
