@@ -2,6 +2,7 @@
 
 S3method(predict,EP_learn)
 export(EP_learn)
+export(EP_learner_spec_CATE)
 export(compute_EP_nuisances)
 export(design_function_sieve_IPW_CATE)
 export(design_function_sieve_IPW_LRR)
