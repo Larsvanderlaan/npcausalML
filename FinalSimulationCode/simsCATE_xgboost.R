@@ -32,7 +32,10 @@ lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" )
 
 
 onesim <- function(n) {
-
+  library(SuperLearner)
+  library(npcausalML)
+  library(future)
+  library(sl3)
   sieve_list <- list_of_sieves_uni
 
   data <- as.data.frame(sim.CATE(n, hard, pos))
