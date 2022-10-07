@@ -1,7 +1,7 @@
 .libPaths( c( .libPaths(), "~/Rlibs") )
 setwd("~/LRRsims")
 print(getwd())
-nsims = 1
+nsims = 1000
 #library(future)
 #plan(multisession, workers = 16)
 

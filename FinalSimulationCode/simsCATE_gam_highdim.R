@@ -203,7 +203,7 @@ pos_list <- c(F,T)
 hard_list <- c(F,T)
 for(pos in pos_list) {
   for(hard in hard_list) {
-nsims <- 10
+
 print(500)
 simresults500 <- lapply(1:nsims, function(i){
   print(i)
