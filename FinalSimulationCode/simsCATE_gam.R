@@ -1,6 +1,8 @@
 print("OK")
 print(.libPaths())
-
+library(SuperLearner)
+library(npcausalML)
+library(future)
 print(getwd())
 plan(multiprocess, workers = 3)
 source("./FinalSimulationCode/simCATE.R")
