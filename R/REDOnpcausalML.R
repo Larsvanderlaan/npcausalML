@@ -5,7 +5,7 @@
 
 
 
-
+#' @export
 compute_EP_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, weights, basis_generator, design_transform, weight_transform, debug = FALSE) {
   EY <- ifelse(A==1, EY1W, EY0W)
   # If no sieve generator given then return original nuisance estimators
@@ -50,7 +50,7 @@ compute_EP_nuisances <- function(V, A, Y, EY1W, EY0W, pA1W, weights, basis_gener
 }
 
 #EP_learner_spec <- list(outcome_type, sieve_design_transform, sieve_weight_transform, EP_family, EP_outcome_transform, EP_weight_transform)
-
+#' @export
 get_EP_learner_task_helper <- function(V, A, Y, EY1W, EY0W, pA1W, weights, sieve_basis_generator, EP_learner_spec, folds) {
 
   EP_nuisances <- compute_EP_nuisances(V, A, Y, EY1W, EY0W, pA1W, weights, sieve_basis_generator, EP_learner_spec$sieve_design_transform, EP_learner_spec$sieve_weight_transform )
@@ -67,6 +67,7 @@ get_EP_learner_task_helper <- function(V, A, Y, EY1W, EY0W, pA1W, weights, sieve
   return(task)
 
 }
+#' @export
 get_EP_learner_task <- function(V, A, Y, EY1W, EY0W, pA1W, weights, sieve_basis_generator, EP_learner_spec, folds = NULL) {
   task_full <-  get_EP_learner_task_helper(V, A, Y, EY1W, EY0W, pA1W, weights, sieve_basis_generator, EP_learner_spec, folds = folds)
   if(is.null(folds)) {
@@ -95,7 +96,7 @@ get_EP_learner_task <- function(V, A, Y, EY1W, EY0W, pA1W, weights, sieve_basis_
 
 
 #
-
+#' @export
 EP_learn <- function(EP_learner, V, A, Y, EY1W, EY0W, pA1W, weights = rep(1, length(A)), sieve_basis_generator_list, EP_learner_spec, train_learners = TRUE, cross_validate = TRUE, nfolds = 10){
   if(cross_validate) {
     folds = origami::folds_vfold(length(A), nfolds)
@@ -174,7 +175,7 @@ EP_learn <- function(EP_learner, V, A, Y, EY1W, EY0W, pA1W, weights = rep(1, len
   return(output)
 
 }
-
+#' @export
 predict.EP_learn <- function(output, V) {
   task <-sl3_Task$new(as.data.table(V), covariates  = colnames(V), outcome = c(), outcome_type = "continuous")
 
