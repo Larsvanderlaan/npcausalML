@@ -208,7 +208,7 @@ print("here")
 
   list(risk_subst_cv = risk_subst_cv, risk_cf = risk_cf, risk_subst = risk_subst, CATEonestepbenchoracle =CATEonestepbenchoracle, CATEonestepbench = CATEonestepbench, sieve =data.frame(sieve_names, cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
-nsims = 10
+
 hard_list <- c(T,F)
 pos_list <- c(T,F)
 for(hard in hard_list) {

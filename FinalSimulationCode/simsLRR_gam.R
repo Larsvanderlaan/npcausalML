@@ -3,7 +3,7 @@ library(SuperLearner)
 library(future)
 library(npcausalML)
 source("FinalSimulationCode/simRR.R")
-
+nsims = 1000
 
 library(earth)
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
@@ -214,7 +214,7 @@ hard_list <- pos_list <- c(F,T)
 
 for(hard in hard_list) {
   for(pos in pos_list) {
-    nsims <- 10
+
     print(250)
     simresults250 <- lapply(1:nsims, function(i){
       print(i)
