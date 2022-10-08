@@ -156,7 +156,7 @@ EP_learn <- function(EP_learner, V, A, Y, EY1W, EY0W, pA1W, weights = rep(1, len
       task <- all_tasks[[1]]
       EP_learner$predict_fold(task, "validation")
     }))
-
+    cv_predictions <- as.data.table(apply(cv_predictions, 2, EP_learner_spec$transform_predictions))
 
     colnames(cv_predictions) <- all_names
 
@@ -168,6 +168,8 @@ EP_learn <- function(EP_learner, V, A, Y, EY1W, EY0W, pA1W, weights = rep(1, len
     task <- all_tasks[[1]]
     EP_learner$predict_fold(task, "full")
   }))
+  full_predictions <- as.data.table(apply(full_predictions, 2, EP_learner_spec$transform_predictions))
+
   colnames(full_predictions) <- all_names
   output$full_predictions <- full_predictions
 

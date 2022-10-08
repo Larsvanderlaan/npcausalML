@@ -8,23 +8,23 @@ source("FinalSimulationCode/simRR.R")
 library(earth)
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam2 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 5
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam4 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 7
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 SL.gam5 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 9
-  SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
+  SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
 }
 list_of_sieves_uni   <- list(
   "no_sieve" = NULL,
@@ -141,31 +141,17 @@ onesim <- function(n) {
   subst_LRR <- log(subst_EY1W/ subst_EY0W)
 
 
+  fit_npcausalML <- EP_learn(LRR_library,V =  data.frame(W = W$W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_LRR, cross_validate = TRUE, nfolds = 5)
+  preds <- fit_npcausalML$full_predictions
 
 
-  fit_npcausalML <- npcausalML(LRR_library,
-                               W= W, A = A, Y = Y, V = data.frame(W = W$W),
-                               EY1W = EY1W_est, EY0W = EY0W_est,  pA1W = pA1W_est,
-                               sl3_Learner_EYAW = NULL, sl3_Learner_pA1W = NULL, outcome_type = "continuous", list_of_sieves = sieve_list,
-                               outcome_function_plugin = outcome_function_plugin_LRR, weight_function_plugin = weight_function_plugin_LRR,
-                               outcome_function_IPW = outcome_function_IPW_LRR, weight_function_IPW = weight_function_IPW_LRR,
-                               design_function_sieve_plugin = design_function_sieve_plugin_LRR,
-                               weight_function_sieve_plugin = weight_function_sieve_plugin_LRR,
-                               design_function_sieve_IPW = design_function_sieve_IPW_LRR, weight_function_sieve_IPW = weight_function_sieve_IPW_LRR,
-                               family_risk_function = binomial(),
-                               efficient_loss_function = efficient_loss_function_LRR,
-                               use_sieve_selector = FALSE,
-                               transform_function =qlogis,
-                               cross_validate_ERM = T, folds = origami::folds_vfold(length(A), 5))
 
-
-  preds <- predict(fit_npcausalML,  data.frame(W = W$W), F)
 
 
   # Compute least-squares risk of predictions using oracle loss function.
   risks_oracle <- as.vector(apply(preds, 2, function(theta) {
     mean((theta -  LRR)^2)
-  })[grep("plugin", colnames(preds))])
+  }) )
 
   # Compute estimated cross-validated one-step risk of predictions
   cvrisksDR <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {
@@ -185,7 +171,7 @@ onesim <- function(n) {
 
   lrnrs_full <-  colnames(fit_npcausalML$cv_predictions)
   lrnrs <- gsub("[._]fourier.+", "", lrnrs_full)
-  lrnrs <- gsub("[._]no_sieve.+", "", lrnrs)
+  lrnrs <- gsub("_no_sieve", "", lrnrs)
   degree <- as.numeric(stringr::str_match(lrnrs_full, "fourier_basis_([0-9]+)")[,2])
   degree[grep("no_sieve", lrnrs_full)] <- 0
 

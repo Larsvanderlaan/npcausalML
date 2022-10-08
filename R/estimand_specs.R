@@ -106,5 +106,9 @@ efficient_loss_function_LRR <- function(theta, A , Y, EY1W , EY0W , pA1W,...){
 
 
 #' @export
-EP_learner_spec_CATE <- list(efficient_loss_function = efficient_loss_function_CATE, outcome_type = "continuous", sieve_design_transform = design_function_sieve_plugin_CATE, sieve_weight_transform  = weight_function_sieve_plugin_CATE, EP_family = gaussian(), EP_outcome_transform = outcome_function_plugin_CATE, EP_weight_transform = weight_function_plugin_CATE)
+EP_learner_spec_CATE <- list(efficient_loss_function = efficient_loss_function_CATE, outcome_type = "continuous", sieve_design_transform = design_function_sieve_plugin_CATE, sieve_weight_transform  = weight_function_sieve_plugin_CATE, EP_family = gaussian(), EP_outcome_transform = outcome_function_plugin_CATE, EP_weight_transform = weight_function_plugin_CATE, transform_predictions = function(x){x})
+
+
+#' @export
+EP_learner_spec_LRR <- list(efficient_loss_function = efficient_loss_function_LRR, outcome_type = "continuous", sieve_design_transform = design_function_sieve_plugin_LRR, sieve_weight_transform  = weight_function_sieve_plugin_LRR, EP_family = binomial(), EP_outcome_transform = outcome_function_plugin_LRR, EP_weight_transform = weight_function_plugin_LRR, transform_predictions = qlogis)
 
