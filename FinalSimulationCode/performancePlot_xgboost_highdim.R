@@ -145,19 +145,21 @@ for(pos in pos_list){
 
 
     dt_tmp<-dt
-    dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
     dt_tmp <- dt_tmp[ grep("xgboost", dt$lrnr), ]
-    max_depth <- stringr::str_match(dt_tmp$lrnr, "[0-9]+$")
+    max_depth <- stringr::str_match(dt_tmp$lrnr, "([0-9]+)_0$")[,2]
     max_depth[is.na(max_depth)] <- "cv"
     dt_tmp$lrnr <- paste0("xgboost (", "max_depth=", max_depth,")")
     dt_tmp <- dt_tmp[max_depth %in% c("1", "2", "3", "5", "cv"),]
-    #dt_tmp <- rbind(dt_tmp, dt[grep("Causal-Forest", dt$type),])
-    dt_tmp <- na.omit(dt_tmp)
+    dt_tmp <- rbind(dt_tmp, dt[grep("Causal-Forest", dt$lrnr),])
+    dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
+
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
       facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
     plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw() + labs(color = "Method", group = "Method", linetype = "Method")
     plt <- plt +  theme_bw() + theme(axis.text=element_text(size=12),
-                       axis.title=element_text(size=14,face="bold"))
+                                     legend.text=element_text(size=12),
+                                     legend.title=element_text(size=12),
+                                     axis.title=element_text(size=14,face="bold"))
     plt <- plt + theme(legend.justification = c(0.9, 0), legend.position = c(0.9, 0))
 
     ggsave(paste0("mainSimResults/performancePlot_CATE_HighDim_xgboost", "pos=",pos, "hard=",hard, ".pdf"), width = 8, height = 7)
@@ -165,13 +167,16 @@ for(pos in pos_list){
 
     dt_tmp<-dt[!(dt$lrnr %in% c("glm", "earth", "gam3", "gam4", "gam5")),]
     dt_tmp <- dt_tmp[grep("rf", dt$lrnr), ]
-     max_depth <- stringr::str_match(dt_tmp$lrnr, "([0-9]+)_xg$")[,2]
+    max_depth <- stringr::str_match(dt_tmp$lrnr, "([0-9]+)_xg$")[,2]
     max_depth[is.na(max_depth)] <- "cv"
     dt_tmp$lrnr <- paste0("ranger (", "max_depth=", max_depth,")")
-    dt_tmp <- dt_tmp[max_depth %in% c("5", "7", "9", "11", "cv"),]
-    dt_tmp <- rbind(dt_tmp, dt[grep("Causal-Forest", dt$lrnr),])
-    dt_tmp$lrnr <- factor(dt_tmp$lrnr, levels = paste0("ranger (", "max_depth=", c("5", "7", "9", "11", "cv"),")"))
+    dt_tmp <- dt_tmp[max_depth %in% c("3", "5", "7", "9", "cv"),]
+    dt_tmp$lrnr <- factor(dt_tmp$lrnr, levels = paste0("ranger (", "max_depth=", c("3", "5", "7", "9", "cv"),")"))
+
+    dt_tmp <- rbind(dt_tmp, dt[grep("causalforest", dt$lrnr),])
+
     dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
+
 
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
       facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
@@ -200,9 +205,13 @@ for(pos in pos_list){
     dt <- rbindlist(sims_list)
 
 
+
+    dt <- rbindlist(sims_list)
+
+
     dt_tmp<-dt
     dt_tmp <- dt_tmp[ grep("xgboost", dt$lrnr), ]
-    max_depth <- stringr::str_match(dt_tmp$lrnr, "[0-9]+$")
+    max_depth <- stringr::str_match(dt_tmp$lrnr, "([0-9]+)_0$")[,2]
     max_depth[is.na(max_depth)] <- "cv"
     dt_tmp$lrnr <- paste0("xgboost (", "max_depth=", max_depth,")")
     dt_tmp <- dt_tmp[max_depth %in% c("1", "5", "cv"),]
@@ -211,7 +220,7 @@ for(pos in pos_list){
 
     dt <- rbind( dt_xg,dt_rf)
     plt <- ggplot(dt, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
-      facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
+      facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
     plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw()+ labs(color = "Method", group = "Method", linetype = "Method")
     plt <- plt +  theme_bw() + theme(axis.text=element_text(size=12),
                                      legend.text=element_text(size=12),
@@ -219,10 +228,7 @@ for(pos in pos_list){
                                      axis.title=element_text(size=14,face="bold"))
     plt <- plt + theme(legend.justification = c(0.9, 0), legend.position = c(0.95, 0.2))
 
-    ggsave(paste0("mainSimResults/performancePlot_CATE_HighDim_tree", "pos=",pos, "hard=",hard, "mainpaper.pdf"), width = 8, height = 7)
-
-
-    dt<- dt_tmp<- rbindlist(sims_list)
+    ggsave(paste0("mainSimResults/performancePlot_CATE_tree", "pos=",pos, "hard=",hard, "mainpaper.pdf"), width = 8, height = 7)
 
 
 

@@ -234,7 +234,7 @@ for(hard in hard_list) {
     print(500)
     simresults500 <- lapply(1:nsims, function(i){
       print(i)
-      onesim(500)
+      try({onesim(500)})
     })
 
     save(simresults500, file = paste0("mainSimResults/","simsCATE", hard,pos, "n500_gam"))
@@ -243,7 +243,7 @@ for(hard in hard_list) {
     print(1000)
     simresults1000 <- lapply(1:nsims, function(i){
       print(i)
-      onesim(1000)
+      try({onesim(1000)})
     })
 
     save(simresults1000, file = paste0("mainSimResults/","simsCATE", hard,pos, "n1000_gam"))
@@ -251,7 +251,7 @@ for(hard in hard_list) {
     print(2500)
     simresults2500 <- lapply(1:nsims, function(i){
       print(i)
-      onesim(2500)
+      try({onesim(2500)})
     })
 
     save(simresults2500, file = paste0("mainSimResults/","simsCATE", hard,pos, "n2500_gam"))
@@ -259,7 +259,7 @@ for(hard in hard_list) {
     print(5000)
     simresults5000 <- lapply(1:nsims, function(i){
       print(i)
-      onesim(5000)
+      try({onesim(5000)})
     })
 
     save(simresults5000, file = paste0("mainSimResults/", "simsCATE", hard,pos, "n5000_gam"))
@@ -268,7 +268,7 @@ for(hard in hard_list) {
     print(250)
     simresults250 <- lapply(1:nsims, function(i){
       print(i)
-      onesim(250)
+      try({onesim(250)})
     })
 
     save(simresults250, file = paste0("mainSimResults/","simsCATE", hard,pos, "n250_gam"))
