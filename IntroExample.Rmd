@@ -19,18 +19,24 @@ quantile(pi0)
 
 
 ```{r}
-
-set.seed(12345)
+ 
+ 
+ 
 library(sl3)
-n = 5000
-W1 <- rt(n, df = 7)
-pi0 <- plogis(2*W1 )
+n = 1500
+W1 <- rt(n, df = 5)
+pi0 <- plogis(W1  )
  
 A <- rbinom(n, 1, pi0)
-mu0 = plogis( W1-2)
-mu1 <- plogis(2*W1+2)
+mu0 = pmin(0.35 + 0.7*plogis( W1-2 ),0.999)
+mu1 <- pmax(mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.35, 0.001)
+mu0 =  0.35 + 0.65*plogis( W1-2 ) 
+mu1 <- mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.349 
 mu <- ifelse(A==1, mu1, mu0)
 Y <- rbinom(n, 1, mu)
+quantile(mu1)
+quantile(mu0)
+ quantile(mu1 - mu0 )
  
  zeta0 <- mu1 - mu0 + (2*A-1) / ifelse(A==1, pi0, 1-pi0) * (Y-mu)
 data_big <- data.frame(W1, A, Y, zeta0, CATE = mu1 - mu0)
@@ -38,22 +44,180 @@ data_big <- data.frame(W1, A, Y, zeta0, CATE = mu1 - mu0)
 
 
 ```{r}
-set.seed(12345)
+ 
+ set.seed(12345)
 library(sl3)
 n = 1500
-W1 <- rt(n, df = 7)
-pi0 <- plogis(2*W1  )
+W1 <- rt(n, df = 5)
+pi0 <- plogis(W1  )
  
 A <- rbinom(n, 1, pi0)
+#mu0 = plogis( W1-2)
+#mu1 <- plogis(2*W1+2)
 mu0 = plogis( W1-2)
 mu1 <- plogis(2*W1+2)
+mu0 =  0.35 + 0.65*plogis( W1-2 ) 
+mu1 <- pmax(mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.35, 0.001)
+mu0 =  0.35 + 0.65*plogis( W1-2 ) 
+mu1 <- mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.349 
 mu <- ifelse(A==1, mu1, mu0)
 Y <- rbinom(n, 1, mu)
  trueCATE <- mu1 - mu0
+ lrnr_stack <- Stack$new(Lrnr_ranger$new(min.node.size=30,max.depth = 1),Lrnr_ranger$new(min.node.size=30,max.depth = 2),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 3),Lrnr_ranger$new(min.node.size=30,max.depth = 4),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 5),
+                   Lrnr_ranger$new(min.node.size=30,max.depth = 6),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 7) )
  
-lrnr <- Lrnr_sl$new(list(
-   Lrnr_ranger$new(max.depth = 3, min.node.size =25)), metalearner= Lrnr_cv_selector$new())
+lrnr <- Lrnr_sl$new(lrnr_stack, metalearner= Lrnr_cv_selector$new())
 
+ 
+  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=as.data.frame(W1), A, Y,  weights = rep(1,n), lrnr, lrnr, folds = 10)
+EY1W_est <- initial_likelihood$EY1W
+EY0W_est <- initial_likelihood$EY0W
+pA1W_est <- initial_likelihood$pA1W
+ EY1W_est_full <- initial_likelihood$EY1W_full
+EY0W_est_full <- initial_likelihood$EY0W_full
+ 
+ 
+
+  CATEonestepbench_cv <- DR_learner(Lrnr_cv$new(lrnr_stack), as.data.frame(W1), A, Y, EY1W_est, EY0W_est, pA1W_est, NULL, NULL)
+   CATEonestepbench <- DR_learner(lrnr_stack, as.data.frame(W1), A, Y, EY1W_est, EY0W_est, pA1W_est, NULL, NULL)
+
+  
+  fit_npcausalML <- EP_learn(lrnr_stack,V = as.data.frame(W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, 
+                             sieve_basis_generator_list = list(fourier_basis$new(c(1,0)), fourier_basis$new(c(2,0)), fourier_basis$new(c(3,0)), fourier_basis$new(c(4,0)),  fourier_basis$new(c(5,0))
+                             ) ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 10)
+
+  
+ risk_fun <- function(theta) {
+    loss <- efficient_loss_function_CATE(data.frame(W1), theta, A, Y, EY1W_est,EY0W_est, pA1W_est )
+    mean(loss)
+ }
+ 
+# risk_fun <- function(theta) {
+  
+ #  loss <- (theta - trueCATE)^2
+  #  mean(loss)
+  #}
+  
+  
+  lrnr_names <- colnames(fit_npcausalML$full_predictions)
+  data <- data.table(CATE = unlist(fit_npcausalML$cv_predictions),lrnr = rep(lrnr_names, n) , Method = "EP")
+    data <- rbind(data,data.table(CATE = unlist(CATEonestepbench_cv),lrnr = rep(names(CATEonestepbench_cv), n) , Method = "DR"))
+
+  data$sieve <- str_match(data$lrnr, "fourier_basis_([0-9])")[,2]
+  data$depth <- str_match(data$lrnr, "ranger_500_TRUE_none_1_30_([0-9])")[,2]
+   risks<-  data[,risk_fun(CATE), by = c("depth", "sieve", "Method")]
+ sieve_dim <-  risks[, sieve[which.min(V1)], by = c("depth", "Method" )]
+sieve_dim_EP <- sieve_dim[sieve_dim$Method=="EP"]
+
+keep <- sapply(1:nrow(sieve_dim_EP), function(i){
+  which(str_detect( lrnr_names, paste0("fourier_basis_", sieve_dim_EP[i,3]))  &  str_detect(lrnr_names, paste0("ranger_500_TRUE_none_1_30_", sieve_dim_EP[i,1])))
+})
+
+
+EP_best_by_depth <- fit_npcausalML$full_predictions[, keep, with = F]
+  
+cv_best_sieve <-  risks[Method == "EP", sieve[which.min(V1)], , by = c( "Method" )]
+cv_best_depth <-  risks[Method == "EP", depth[which.min(V1)], , by = c( "Method" )]
+
+keep <- which(str_detect( lrnr_names, paste0("fourier_basis_", cv_best_sieve[[2]]))  &  str_detect(lrnr_names, paste0("ranger_500_TRUE_none_1_30_", cv_best_depth[[2]])))
+EP_cv <-    fit_npcausalML$full_predictions[, keep, with = F][[1]]
+
+
+ cv_best_depth <-  risks[Method == "DR", depth[which.min(V1)], , by = c( "Method" )]
+keep <- which(    str_detect(colnames(CATEonestepbench), paste0("ranger_500_TRUE_none_1_30_", cv_best_depth[[2]])))
+
+DR_cv <-CATEonestepbench[,keep, with = F][[1]]
+
+ data <- data.table(CATE = unlist(fit_npcausalML$full_predictions), CATE_cv =unlist(fit_npcausalML$cv_predictions),  lrnr = rep(lrnr_names, each = n) , Method = "EP")
+    data <- rbind(data,data.table(CATE = unlist(CATEonestepbench), CATE_cv = unlist(CATEonestepbench_cv), lrnr = rep(names(CATEonestepbench_cv), each = n) , Method = "DR"))
+    
+  data$sieve <- str_match(data$lrnr, "fourier_basis_([0-9])")[,2]
+  data$depth <- str_match(data$lrnr, "ranger_500_TRUE_none_1_30_([0-9])")[,2]
+  data$lrnr <- NULL
+  data[, cv_risks := risk_fun(CATE_cv), by = c("Method", "sieve", "depth")]
+  data[, best_sieve := sieve[which.min(cv_risks)], by = c("Method",  "depth")]
+  data$best_sieve[data$Method=="DR"] <- which(data$Method == "DR")
+  data <- data[sieve == best_sieve | Method == "DR",]
+  data[, best_depth_cv := depth[which.min(cv_risks)], by = c("Method")]
+  data_cv <- data[depth == best_depth_cv, c("CATE", "Method", "depth"), with = F]
+  data_cv$depth = "CV-Selected Max Depth"
+  data$depth <- paste0("Max Depth = ", data$depth)
+  data <- rbind(data[, c("CATE", "Method", "depth"), with = F]  ,data_cv)
+  data_true <- data[Method == "DR"]
+  data_true$CATE <- rep(trueCATE, 12000/1500)
+  data_true$Method <- "Truth"
+  data <- rbind(data,data_true)
+    colnames(data) <- c("CATE_est", "Method", "Tuning")
+ 
+ mean((trueCATE - (EY1W_est_full- EY0W_est_full))^2)
+  mean((trueCATE - data_cv$CATE_est[data_cv$Method=="DR"])^2)
+  mean((trueCATE - data_cv$CATE_est[data_cv$Method=="EP"])^2)
+
+   
+ 
+data <- as.data.frame(data)
+data$X <- W1
+ data_1 <- data[data$Tuning %in% c(paste0("Max Depth = ", c(1,2,4,7))),]
+ data_cv <-  data[data$Tuning %in% c(paste0("CV-Selected Max Depth")),]
+  
+ as.data.table(data)[, mean((CATE_est -  data_big$CATE)^2), by = c("Method", "Tuning")]
+ library(ggplot2)
+p<- ggplot(data_1)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
+  theme(legend.position="none")+ scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))  +  scale_size_manual(  values=c(0.5,0.75, 0.4) )
+ggsave(file = "boundViol.pdf", width = 9, height = 4)
+
+
+ 
+ 
+
+
+p<-ggplot(data_cv)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.1,5),-1.1), color = Method, linetype = Method ), size = 1) + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + theme_bw()+ scale_colour_manual(values = c("red", "blue", "darkgreen", "black"))  + theme(legend.margin=margin(t=0, r=1, b=-1.5, l=1, unit="cm")) + facet_grid(~ Tuning )+
+  theme(legend.key.size = unit(1.5, 'cm'), #change legend key size
+        legend.key.height = unit(1.5, 'cm'), #change legend key height
+        legend.key.width = unit(1.5, 'cm'), #change legend key width
+        legend.title =  element_blank(), #change legend title font size
+        legend.text = element_text(size=13), 
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20))   + scale_linetype_manual(values=c("twodash", "dotdash", "dotted",  "solid"))
+ggsave(file = "boundViol_cv_T.pdf", width = 9, height =5)
+
+
+data_cv <- data_cv[data_cv$Method != "T-Learner",]
+p<-ggplot(data_cv)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.1,5),-1.1), color = Method, linetype = Method ), size = 1) + scale_x_continuous(limits=c(-3,3))  + labs(x = "Covariate (W)", y = "CATE")  + theme_bw()+ scale_colour_manual(values = c("red", "blue",   "black"))  + theme(legend.margin=margin(t=0, r=1, b=-1.5, l=1, unit="cm")) + scale_y_continuous(limits = c(-0.5, 0.5)) + facet_grid(~ Tuning )+
+  theme(legend.key.size = unit(1.5, 'cm'), #change legend key size
+        legend.key.height = unit(1.5, 'cm'), #change legend key height
+        legend.key.width = unit(1.5, 'cm'), #change legend key width
+        legend.title =  element_blank(), #change legend title font size
+        legend.text = element_text(size=13), 
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20)) + scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))
+ggsave(file = "boundViol_cv.pdf", width = 9, height =5)
+
+
+```
+
+```{r}
+    sieve <- str_match(lrnr_names, "fourier_basis_([0-9])")[,2]
+
+  depth <- str_match(lrnr_names, "ranger_500_TRUE_none_1_30_([0-9])")[,2]
+  data <- data.table(CATE = unlist(fit_npcausalML$cv_predictions),sieve =  rep(sieve, each = n) ,depth =  rep(depth, each = n))
+ risks<-  data[,risk_fun(CATE), by = c("depth", "sieve")]
+ risks
+ sieve_dim <-  risks[, sieve[which.min(V1)], by = c("depth" )]
+
+   fit_npcausalML$full_predictions[,str_detect(lrnr_names, paste0("fourier_basis_", sieve_dim[[2]])) &  str_detect(lrnr_names, paste0("ranger_500_TRUE_none_1_30_", sieve_dim[[1]]))]
+   
+ risks[, sieve[which.min(V1)] ]
+   risks[, depth[which.min(V1)] ]
+
+```
+
+
+
+```{r}
 data <- as.data.frame(cbind(W1,A,Y))
  taskY <- sl3_Task$new(data, c("W1"), "Y")
   taskA <- sl3_Task$new(data, c("W1"), "A")
@@ -69,11 +233,11 @@ CATE_T <- lrnr_Y1$predict(task_big) -  lrnr_Y0$predict(task_big)
  
 
 
- X <- (2*A-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1) , sin(3*W1) , cos(3*W1),  sin(4*W1) , cos(4*W1))
+ X <- (2*A-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1)    )
  colnames(X) <- paste0("W", seq_len(ncol(X)))
-  X1 <- (2*1-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1) , sin(3*W1) , cos(3*W1),  sin(4*W1) , cos(4*W1))
+  X1 <- (2*1-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1)    )
  colnames(X1) <- paste0("W", seq_len(ncol(X)))
-  X0 <- (2*0-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1) , sin(3*W1) , cos(3*W1),  sin(4*W1) , cos(4*W1))
+  X0 <- (2*0-1)*cbind(1,sin(W1),  cos(W1) , sin(2*W1) , cos(2*W1)      )
  colnames(X0) <- paste0("W", seq_len(ncol(X)))
 data <- data.frame(W1,A,Y, mu, weights =  1 / ifelse(A==1, pi0, 1 - pi0))
 data1 <- data.frame(W1,A=1,Y, mu=mu1, weights =  1 / ifelse(A==1, pi0, 1 - pi0))
@@ -116,14 +280,18 @@ lrnr <- Lrnr_stratified$new(Lrnr_mean$new(), "bins")
 
 task <- sl3_Task$new(data, c("W1" ), "zeta0")
 task_big <- sl3_Task$new(data_big, c("W1" ), "zeta0")
+ 
 lrnr <- Lrnr_sl$new(list( 
-   Lrnr_xgboost$new(max_depth = 2, nrounds = 1),
-                         Lrnr_xgboost$new(max_depth = 3, nrounds = 1),
-                         Lrnr_xgboost$new(max_depth = 4, nrounds = 1),
-                          Lrnr_xgboost$new(max_depth = 5, nrounds = 1)
+   Lrnr_ranger$new(min.node.size=30,max.depth = 1),
+                          Lrnr_ranger$new(min.node.size=30,max.depth = 2),
+    Lrnr_ranger$new(min.node.size=30,max.depth = 3),
+    Lrnr_ranger$new(min.node.size=30,max.depth = 4),
+    Lrnr_ranger$new(min.node.size=30,max.depth = 5),
+    Lrnr_ranger$new(min.node.size=30,max.depth = 6),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 7) 
                          ), metalearner = Lrnr_cv_selector$new())
- lrnr <-  Lrnr_xgboost$new(max_depth =3, nrounds = 20)
 
+ 
 CATE_hist <- lrnr$train(task)$predict(task_big)
  
 
@@ -137,55 +305,111 @@ CATE_hist_EP <- lrnr$train(task)$predict(task_big)
  
 library(ggplot2)
  
-set.seed(12345)
+ 
 task <- sl3_Task$new(data, c("W1"), "zeta0")
 task_big <- sl3_Task$new(data_big, c("W1", "bins"), "zeta0")
-
-lrnr <- Lrnr_ranger$new(max.depth = 3, min.node.size =25) #, min.node.size =25)
  
-CATE_rf <- lrnr$train(task)$predict(task)
-plot(task$X[[1]], CATE_rf)
-
-set.seed(12345)
-task <- sl3_Task$new(data, c("W1"), "zeta0")
-task_big <- sl3_Task$new(data_big, c("W1", "bins"), "zeta0")
-
-#lrnr <- Lrnr_ranger$new(max.decpth = 3, min.node.size =300) #, min.node.size =25)
-library(ranger)
-fit <-  ranger(   x = data.frame(W1=data$W1), y = zeta0, max.depth = 3, min.node.size = 30, num.trees=2000)
-CATE_rf <- predict(fit, data =  data.frame(W1=data_big$W1))$predictions
- 
-plot(data_big$W1, CATE_rf)
-
+lrnr <- Stack$new(Lrnr_ranger$new(min.node.size=30,max.depth = 1),Lrnr_ranger$new(min.node.size=30,max.depth = 2),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 3),Lrnr_ranger$new(min.node.size=30,max.depth = 4),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 5),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 6),
+                  Lrnr_ranger$new(min.node.size=30,max.depth = 7)  )
+                  
 
  
- 
-fit <-  ranger(   x = data.frame(W1=data$W1), y = EP_outcome, max.depth = 3, min.node.size = 30, num.trees=2000)
-CATE_EP_rf <- predict(fit, data =  data.frame(W1=data_big$W1))$predictions
- plot(data_big$W1, CATE_EP_rf)
-
-
+CATE_rf<- lrnr$train(task)$predict(task_big)
  
 
-
-data <- rbind(data.frame(Method = "DR-learner", Learner = "Histogram", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_hist ),
-              data.frame(Method = "DR-learner", Learner = "Random forests", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_rf ),
-              
-              data.frame(Method = "EP-learner",  Learner = "Histogram", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_hist_EP),
-                data.frame(Method = "EP-learner", Learner = "Random forests", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_EP_rf) 
-)
+ task <- sl3_Task$new(data, c("W1" ), "EP_outcome")
+#lrnr <- Lrnr_stratified$new(Lrnr_mean$new(), "bins")
+ #lrnr <-  Lrnr_xgboost$new(max_depth =3, nrounds = 20)
+CATE_rf_EP <- lrnr$train(task)$predict(task_big)
 
  
-ggplot(data)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.5,5),-1.5), color = Method, linetype = Method ) )   + scale_x_continuous(limits=c(-3,3)) + labs(x = "W", y = "CATE")  +  geom_line(aes(x = X, y = CATE_true ), color = "black", alpha = 0.4 )+ scale_y_continuous(limits = c(-1.5, 1.5) ) + theme_bw() + facet_grid(~ Learner)+ facet_grid(~ Learner)+ scale_colour_manual(values = c("red", "blue")) 
-ggsave(file = "boundViol.pdf")
+CATE_rf <- as.data.frame(cbind(CATE_hist, CATE_rf))
+colnames(CATE_rf) <- c("CV-Selected Max Depth", paste0("Max Depth = ", 1:7))
+library(data.table)
+CATE_rf <- rbindlist(lapply(seq_len(ncol(CATE_rf)), function(j){
+  out <- CATE_rf[,j, drop = F]
+  out$tuning <- colnames(CATE_rf)[j]
+  out
+}))
+ CATE_rf$Method <- "DR-Learner"
+CATE_rf_EP <- as.data.frame(cbind(CATE_hist_EP, CATE_rf_EP))
+colnames(CATE_rf_EP) <- c("CV-Selected Max Depth", paste0("Max Depth = ", 1:7))
+CATE_rf_EP <- rbindlist(lapply(seq_len(ncol(CATE_rf_EP)), function(j){
+  out <- CATE_rf_EP[,j, drop = F]
+  out$tuning <- colnames(CATE_rf_EP)[j]
+  out
+}))
+ CATE_rf_EP$Method <- "EP-Learner (Ours)"
+ 
+ 
+  colnames(CATE_rf_EP) <- c("CATE_est", "Tuning", "Method")
+  colnames(CATE_rf) <- c("CATE_est", "Tuning", "Method")
 
+  
+CATE_rf_T <- data.frame(CATE_est = CATE_T, Tuning = "CV-Selected Max Depth", Method = "T-Learner")
+```
+
+
+```{r}
+data <- rbind(CATE_rf, CATE_rf_EP, CATE_rf_T)
+
+  data <- as.data.frame(data)
+  CATE_true <- as.data.frame(CATE_rf)
+  CATE_true$Method <- "Truth"
+  CATE_true$CATE_est <-  data_big$CATE
+  CATE_true <- CATE_true[,colnames(CATE_rf)]
+  data <- rbind(data, CATE_true)
+ data$X <-data_big$W1
+ 
+ data_1 <- data[data$Tuning %in% c(paste0("Max Depth = ", c(1,2,4,7))),]
+ data_cv <-  data[data$Tuning %in% c(paste0("CV-Selected Max Depth")),]
+  
+ as.data.table(data)[, mean((CATE_est -  data_big$CATE)^2), by = c("Method", "Tuning")]
+ 
+p<- ggplot(data_1)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
+  theme(legend.position="none")+ scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))  +  scale_size_manual(  values=c(0.5,0.75, 0.4) )
+ggsave(file = "boundViol.pdf", width = 9, height = 4)
+
+
+ 
+ 
+
+
+p<-ggplot(data_cv)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.1,5),-1.1), color = Method, linetype = Method ), size = 1) + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + theme_bw()+ scale_colour_manual(values = c("red", "blue", "darkgreen", "black"))  + theme(legend.margin=margin(t=0, r=1, b=-1.5, l=1, unit="cm")) + facet_grid(~ Tuning )+
+  theme(legend.key.size = unit(1.5, 'cm'), #change legend key size
+        legend.key.height = unit(1.5, 'cm'), #change legend key height
+        legend.key.width = unit(1.5, 'cm'), #change legend key width
+        legend.title =  element_blank(), #change legend title font size
+        legend.text = element_text(size=13), 
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20))   + scale_linetype_manual(values=c("twodash", "dotdash", "dotted",  "solid"))
+ggsave(file = "boundViol_cv_T.pdf", width = 9, height =5)
+
+
+data_cv <- data_cv[data_cv$Method != "T-Learner",]
+p<-ggplot(data_cv)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.1,5),-1.1), color = Method, linetype = Method ), size = 1) + scale_x_continuous(limits=c(-3,3))  + labs(x = "Covariate (W)", y = "CATE")  + theme_bw()+ scale_colour_manual(values = c("red", "blue",   "black"))  + theme(legend.margin=margin(t=0, r=1, b=-1.5, l=1, unit="cm")) + scale_y_continuous(limits = c(-0.5, 0.5)) + facet_grid(~ Tuning )+
+  theme(legend.key.size = unit(1.5, 'cm'), #change legend key size
+        legend.key.height = unit(1.5, 'cm'), #change legend key height
+        legend.key.width = unit(1.5, 'cm'), #change legend key width
+        legend.title =  element_blank(), #change legend title font size
+        legend.text = element_text(size=13), 
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20)) + scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))
+ggsave(file = "boundViol_cv.pdf", width = 9, height =5)
+
+```
+
+```{r}
 
 
 data <- rbind( 
-              data.frame(Method = "EP-learner",  Learner = "Histogram", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_hist_EP),
-                data.frame(Method = "EP-learner", Learner = "Random forests", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_EP_rf),
-              data.frame(Method = "T-learner", Learner = "Histogram", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est =CATE_T  ),
-              data.frame(Method = "T-learner", Learner = "Random forests", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_T )
+              data.frame(Method = "EP-Learner (Ours)",  Learner = "Histogram", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_hist_EP),
+                data.frame(Method = "EP-Learner (Ours)", Learner = "Random forests", X=data_big$W1,  CATE_true = data_big$CATE, CATE_est = CATE_EP_rf),
+              data.frame(Method = "T-Learner", Learner = "Histogram", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est =CATE_T  ),
+              data.frame(Method = "T-Learner", Learner = "Random forests", X=data_big$W1,    CATE_true = data_big$CATE, CATE_est = CATE_T )
 )
 
  
@@ -193,13 +417,13 @@ ggplot(data)   + geom_line(aes(x = X, y = CATE_est, color = Method, linetype = M
 ggsave(file = "boundViol_T.pdf")
 
 
-# ggplot(data) + geom_line( aes(x=X, y = AIPW_strat, color = "DR-learner: Binned")) +
-#   geom_line(aes(y = CATE_rf, x = X, color = "DR-learner: random forests")) + 
+# ggplot(data) + geom_line( aes(x=X, y = AIPW_strat, color = "DR-Learner: Binned")) +
+#   geom_line(aes(y = CATE_rf, x = X, color = "DR-Learner: random forests")) + 
 #   geom_smooth(aes(x = X, y = CATE, color = "Truth") )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "W", y = "CATE") + scale_y_continuous(limits = c(-1.5, 2) ) +  scale_colour_manual("", 
-#                       breaks = c("DR-learner: Binned", "DR-learner: random forests", "True CATE"),
+#                       breaks = c("DR-Learner: Binned", "DR-Learner: random forests", "True CATE"),
 #                       values = c("red",   "blue", "black")) + theme_bw()  
 # 
-# ggplot(data.frame(X=data$W1,Y = data$zeta0), aes(x= Y)) + geom_histogram()  + theme_bw() +scale_x_continuous(breaks = seq(-6,6,1)) + labs(x = "Oracle pseudo-outcome for DR-learner")
+# ggplot(data.frame(X=data$W1,Y = data$zeta0), aes(x= Y)) + geom_histogram()  + theme_bw() +scale_x_continuous(breaks = seq(-6,6,1)) + labs(x = "Oracle pseudo-outcome for DR-Learner")
 
 
 
@@ -235,7 +459,7 @@ Y <- rbinom(n, 1, mu)
 data <- data.frame(W1,W2,A ,Y)
 lrnr <- Lrnr_cv$new(Stack$new(Lrnr_xgboost$new(max_depth = 3, nrounds = 20), Lrnr_xgboost$new(max_depth = 4, nrounds = 20), Lrnr_xgboost$new(max_depth = 5, nrounds = 20)))
 lrnr <- make_learner(Pipeline, lrnr, Lrnr_cv_selector$new())
-lrnr <- Lrnr_ranger$new(max_depth = 10)
+lrnr <- Lrnr_ranger$new(min.node.size=30,max_depth = 10)
 task_A <- sl3_Task$new(data, c("W1", "W2"), "A")
 task_Y <- sl3_Task$new(data, c("W1", "W2", "A"), "Y")
 data1 <- data0 <- data

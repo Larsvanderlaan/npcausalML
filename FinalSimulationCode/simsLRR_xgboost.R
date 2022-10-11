@@ -181,7 +181,7 @@ print("done")
   # Compute least-squares risk of predictions using oracle loss function.
   risks_oracle <- as.vector(apply(preds, 2, function(theta) {
     mean((theta -  LRR)^2)
-  })
+  }))
 
   # Compute estimated cross-validated one-step risk of predictions
   cvrisksDR <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {

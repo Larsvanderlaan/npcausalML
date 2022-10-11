@@ -29,14 +29,16 @@ estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1
   task_EY1W <- sl3_Task$new(data1, covariates = c(covariates, "A"), outcome = "Y", weights = "weights", folds = folds, outcome_type = outcome_type)
   task_EY0W <- sl3_Task$new(data0, covariates = c(covariates, "A"), outcome = "Y", weights = "weights", folds = folds, outcome_type = outcome_type)
 
-  EY <- sl3_Learner_EYAW_trained$predict(task_EY)
-  EY1W <- sl3_Learner_EYAW_trained$predict(task_EY1W)
-  EY0W <- sl3_Learner_EYAW_trained$predict(task_EY0W)
+  EY <- sl3_Learner_EYAW_trained$predict_fold(task_EY, "validation")
+  EY1W <- sl3_Learner_EYAW_trained$predict_fold(task_EY1W, "validation")
+  EY0W <- sl3_Learner_EYAW_trained$predict_fold(task_EY0W, "validation")
+  EY1W_full <- sl3_Learner_EYAW_trained$predict_fold(task_EY1W, "full")
+  EY0W_full <- sl3_Learner_EYAW_trained$predict_fold(task_EY0W, "full")
   #print(data.table(EY, EY1W, EY0W))
   #if(any(c(EY,EY1W,EY0W ) <0) ){
    # stop("Negative values detected in estimated initial predictions of the conditional mean E[Y | A, W]. The predictions should be nonnegative.")
   #}
-  pA1W <- sl3_Learner_pA1W_trained$predict(task_pA1W)
+  pA1W <- sl3_Learner_pA1W_trained$predict_fold(task_pA1W, "validation")
   pA1W <- pmax(pmin(pA1W, 0.995), 0.005)
  # if(any(EY != ifelse(A==1, EY1W, EY0W))) {
   #  print(data.table(A, EY, EY1W, EY0W))
@@ -45,6 +47,6 @@ estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1
 
 
   internal <-  list(task_pA1W = task_pA1W, task_EY = task_EY, sl3_Learner_pA1W_trained = sl3_Learner_pA1W_trained, sl3_Learner_EYAW_trained = sl3_Learner_EYAW_trained, folds = folds)
-  output <- list(pA1W = pA1W, EY1W = EY1W, EY0W = EY0W,folds = folds, internal = internal)
+  output <- list(pA1W = pA1W, EY1W = EY1W, EY0W = EY0W, EY1W_full = EY1W_full, EY0W_full = EY0W_full,folds = folds, internal = internal)
   return(output)
 }

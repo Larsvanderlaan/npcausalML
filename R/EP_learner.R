@@ -107,8 +107,8 @@ EP_learn <- function(EP_learner, V, A, Y, EY1W, EY0W, pA1W, weights = rep(1, len
     task <- get_EP_learner_task(V, A, Y, EY1W, EY0W, pA1W, weights, sieve_basis_generator, EP_learner_spec, folds = folds)
     return(task)
   })
-  if(class(EP_learner) == "Stack"){
-    EP_learner <- EP_learner$learners
+  if("Stack" %in% class(EP_learner) ){
+    EP_learner <- EP_learner$params$learners
   } else if(!is.list(EP_learner)) {
     EP_learner <- list(EP_learner)
   }
