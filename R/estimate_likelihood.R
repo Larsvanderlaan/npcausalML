@@ -32,8 +32,9 @@ estimate_initial_likelihood <- function(W, A, Y, weights = NULL, sl3_Learner_pA1
   EY <- sl3_Learner_EYAW_trained$predict_fold(task_EY, "validation")
   EY1W <- sl3_Learner_EYAW_trained$predict_fold(task_EY1W, "validation")
   EY0W <- sl3_Learner_EYAW_trained$predict_fold(task_EY0W, "validation")
-  EY1W_full <- sl3_Learner_EYAW_trained$predict_fold(task_EY1W, "full")
-  EY0W_full <- sl3_Learner_EYAW_trained$predict_fold(task_EY0W, "full")
+  EY1W_full <- EY0W_full <- NULL
+  try({EY1W_full <- sl3_Learner_EYAW_trained$predict_fold(task_EY1W, "full")
+  EY0W_full <- sl3_Learner_EYAW_trained$predict_fold(task_EY0W, "full")})
   #print(data.table(EY, EY1W, EY0W))
   #if(any(c(EY,EY1W,EY0W ) <0) ){
    # stop("Negative values detected in estimated initial predictions of the conditional mean E[Y | A, W]. The predictions should be nonnegative.")

@@ -69,7 +69,7 @@ onesim <- function(n) {
       Lrnr_xgboost$new(max_depth =3),
       Lrnr_xgboost$new(max_depth =4),
       Lrnr_xgboost$new(max_depth =5),
-      Lrnr_xgboost$new(max_depth =6),
+     # Lrnr_xgboost$new(max_depth =6),
       lrnr_gam2,   lrnr_gam5), "A"))
     , Lrnr_cv_selector$new(loss_squared_error))
 
@@ -79,7 +79,7 @@ onesim <- function(n) {
       Lrnr_xgboost$new(max_depth =3),
       Lrnr_xgboost$new(max_depth =4),
       Lrnr_xgboost$new(max_depth =5),
-      Lrnr_xgboost$new(max_depth =6),
+     # Lrnr_xgboost$new(max_depth =6),
       lrnr_gam2,   lrnr_gam5)
   )
   , Lrnr_cv_selector$new(loss_squared_error))
@@ -87,7 +87,7 @@ onesim <- function(n) {
 
   data_train <-  data #as.data.frame(sim.CATE(n, hard, pos))
 
-  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,grep("W", colnames(data_train))], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 5)
+  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,grep("W", colnames(data_train))], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 2)
   data1 <- data
   data0 <- data
   data1$A <- 1
@@ -105,8 +105,8 @@ onesim <- function(n) {
   pA1W_est <- pmax(pA1W_est, 0.01)
   pA1W_est <- pmin(pA1W_est, 0.99)
 
-  lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 20),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 20), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 20), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 20),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 20),   Lrnr_xgboost$new(max_depth = 6, verbosity = 0, nrounds = 20) )
-  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error))
+  lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 20),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 20), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 20), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 20),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 20))#,   Lrnr_xgboost$new(max_depth = 6, verbosity = 0, nrounds = 20) )
+  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error),folds = origami::folds_vfold(length(A), 2))
 
 
   lrnr_rf <- list(Lrnr_ranger$new(
@@ -114,11 +114,11 @@ onesim <- function(n) {
     Lrnr_ranger$new(
       max.depth = 5, name = "Lrnr_rf_5_xg"),
     Lrnr_ranger$new(
-      max.depth = 7, name = "Lrnr_rf_7_xg"),
-    Lrnr_ranger$new(
-      max.depth = 9, name = "Lrnr_rf_9_xg"))
+      max.depth = 7, name = "Lrnr_rf_7_xg"))#,
+   # Lrnr_ranger$new(
+    #  max.depth = 9, name = "Lrnr_rf_9_xg"))
 
-  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error))
+  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error), folds = origami::folds_vfold(length(A), 2))
 
 
   CATE_library <- c(lrnr_rf,   lrnr_xg  )
@@ -141,7 +141,7 @@ onesim <- function(n) {
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
 
 
-  fit_npcausalML <- EP_learn(CATE_library,V = as.data.frame(W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = list_of_sieves_high_dim ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
+  fit_npcausalML <- EP_learn(CATE_library,V = as.data.frame(W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = list_of_sieves_high_dim ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 2)
 
 
   preds <- fit_npcausalML$full_predictions
