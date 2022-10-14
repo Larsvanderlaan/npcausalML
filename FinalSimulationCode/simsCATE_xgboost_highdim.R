@@ -41,8 +41,6 @@ lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" , name = "Lrnr_gam_s4_x")
 lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" , name = "Lrnr_gam_s5_x")
 
 
-hard <- F
-pos <- F
 
 onesim <- function(n) {
   print(hard)
@@ -214,7 +212,7 @@ onesim <- function(n) {
 
   Y.hat <- EY1W_est * pA1W_est + EY0W_est * (1-pA1W_est)
   W.hat <- pA1W_est
-  fit <- grf::causal_forest(X = W, Y  = Y, W = A, Y.hat = Y.hat, W.hat = W.hat)
+  fit <- grf::causal_forest(X = W, Y  = Y, W = A, Y.hat = Y.hat, W.hat = W.hat, num.trees = 500, tune.parameters = "all")
   preds_cf <-  fit$predictions
   risk_cf <- mean((CATE - preds_cf)^2)
 
@@ -223,51 +221,14 @@ onesim <- function(n) {
   list(risk_subst_cv = risk_subst_cv, risk_cf = risk_cf, risk_subst = risk_subst, CATEonestepbenchoracle =CATEonestepbenchoracle, CATEonestepbench = CATEonestepbench, sieve =data.frame(sieve_names, cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
 
-hard_list <- c(F,T)
-pos_list <- c(F,T)
-for(hard in hard_list){
-  for(pos in pos_list) {
+hard <- hard == "TRUE"
+pos <- pos == "TRUE"
+n <- as.numeric(n)
 
+simresults <- lapply(1:nsims, function(i){try({
+  print(i)
+  onesim(n)
+})
+})
+save(simresults, file = paste0("mainSimResults/","simsCATE", hard,pos, "n", n, "_xgboost_highDim"))
 
-    print(500)
-    simresults500 <- lapply(1:nsims, function(i){
-      print(i)
-      try({onesim(500)})
-    })
-
-    save(simresults500, file = paste0("mainSimResults/","simsCATE", hard,pos, "n500_xgboost_highDim"))
-
-
-    print(1000)
-    simresults1000 <- lapply(1:nsims, function(i){
-      print(i)
-      try({onesim(1000)})
-    })
-
-    save(simresults1000, file = paste0("mainSimResults/","simsCATE", hard,pos, "n1000_xgboost_highDim"))
-
-    print(2500)
-    simresults2500 <- lapply(1:nsims, function(i){
-      print(i)
-      try({onesim(2500)})
-    })
-
-    save(simresults2500, file = paste0("mainSimResults/","simsCATE", hard,pos, "n2500_xgboost_highDim"))
-
-    print(5000)
-    simresults5000 <- lapply(1:nsims, function(i){
-      print(i)
-      try({onesim(5000)})
-    })
-
-    save(simresults5000, file = paste0("mainSimResults/", "simsCATE", hard,pos, "n5000_xgboost_highDim"))
-
-
-    #print(10000)
-    #simresults10000 <- lapply(1:nsims, function(i){
-     # print(i)
-      #onesim(10000)
-    #})
-
-    #save(simresults10000, file = paste0("mainSimResults/","simsCATE", hard,pos, "n10000_xgboost_highDim"))
-  }}

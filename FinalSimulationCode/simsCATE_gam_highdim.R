@@ -2,7 +2,7 @@ library(SuperLearner)
 library(npcausalML)
 library(future)
 source("./FinalSimulationCode/simCATEHighDim.R")
-#plan(cluster, workers = 3)
+plan(multiprocess, workers = 10)
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
   SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
@@ -40,10 +40,10 @@ lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" , name = "Lrnr_gam_s4_x")
 lrnr_gam5 <- Lrnr_pkg_SuperLearner$new("SL.gam5" , name = "Lrnr_gam_s5_x")
 
 
-hard <- T
-pos <- T
+
 
 onesim <- function(n) {
+  print(n)
   print(pos)
   print(hard)
   sieve_list <- list_of_sieves_high_dim
@@ -103,7 +103,7 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   lrnr_gam <- list(   lrnr_gam1, lrnr_gam2, lrnr_gam3, lrnr_gam4, lrnr_gam5 )
-  lrnr_gam_sl <-  Lrnr_sl$new(lrnr_gam, metalearner = Lrnr_cv_selector$new(loss_squared_error))
+  lrnr_gam_sl <-  Lrnr_sl$new(lrnr_gam, metalearner = Lrnr_cv_selector$new(loss_squared_error), folds = origami::folds_vfold(length(A), 2))
 
 
   lrnr_lm <- list(Lrnr_earth$new(), Lrnr_glm$new())
@@ -125,8 +125,8 @@ onesim <- function(n) {
 
   # apply(subst_EY1W -subst_EY0W , 2, function(p) {mean((p - CATE)^2)})
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
-
-  fit_npcausalML <- EP_learn(CATE_library,V = as.data.frame(W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = list_of_sieves_high_dim ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
+print("Jrtr")
+  fit_npcausalML <- EP_learn(CATE_library,V = as.data.frame(W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = list_of_sieves_high_dim ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 2)
 
 
   preds <- fit_npcausalML$full_predictions
@@ -199,53 +199,15 @@ onesim <- function(n) {
   list(risk_subst_cv = risk_subst_cv,   risk_subst = risk_subst, CATEonestepbenchoracle =CATEonestepbenchoracle, CATEonestepbench = CATEonestepbench, sieve =data.frame(sieve_names, cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
 
-pos_list <- c(F,T)
-hard_list <- c(F,T)
-for(pos in pos_list) {
-  for(hard in hard_list) {
 
-print(500)
-simresults500 <- lapply(1:nsims, function(i){try({
+hard <- hard == "TRUE"
+pos <- pos == "TRUE"
+n <- as.numeric(n)
+
+simresults <- lapply(1:nsims, function(i){try({
   print(i)
-  onesim(500)
+  onesim(n)
 })
 })
+save(simresults, file = paste0("mainSimResults/","simsCATE", hard,pos, "n", n, "_gam_highDim"))
 
-save(simresults500, file = paste0("mainSimResults/","simsCATE", hard,pos, "n500_gam_highDim"))
-
-
-print(1000)
-simresults1000 <- lapply(1:nsims, function(i){
-  print(i)
- try({ onesim(1000)})
-})
-
-save(simresults1000, file = paste0("mainSimResults/","simsCATE", hard,pos, "n1000_gam_highDim"))
-
-print(2500)
-simresults2500 <- lapply(1:nsims, function(i){
-  print(i)
-  try({ onesim(2500)})
-})
-
-save(simresults2500, file = paste0("mainSimResults/","simsCATE", hard,pos, "n2500_gam_highDim"))
-
-print(5000)
-simresults5000 <- lapply(1:nsims, function(i){
-  print(i)
-  try({ onesim(5000)})
-})
-
-save(simresults5000, file = paste0("mainSimResults/", "simsCATE", hard,pos, "n5000_gam_highDim"))
-
-
-# print(10000)
-# simresults10000 <- lapply(1:nsims, function(i){
-#   print(i)
-#   onesim(10000)
-# })
-#
-# save(simresults10000, file = paste0("mainSimResults/","simsCATE", hard,pos, "n10000_gam_highDim"))
-
-  }
-}

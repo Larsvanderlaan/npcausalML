@@ -1,12 +1,12 @@
-#!/bin/bash
-#SBATCH --job-name LarsJob%jls        # Set a name for your job. This is especially useful if you have multiple jobs queued.
-#SBATCH --partition medium       # Slurm partition to use
-#SBATCH --ntasks 20            # Number of tasks to run. By default, one CPU core will be allocated per task
-#SBATCH --time 10-00:00          # Wall time limit in D-HH:MM
-#SBATCH --mem-per-cpu=10000       # Memory limit for each tasks (in MB)
-#SBATCH -o ./%j.out      # File to which STDOUT will be written
-#SBATCH -e ./%j.err      # File to which STDERR will be written
-#SBATCH --mail-type=NONE        # Type of email notification- NONE,BEGIN,END,FAIL,ALL
-#SBATCH --mail-user=lvdlaan@uw.edu # Email to which notifications will be sent
+#!/bin/csh
+#SBATCH --time=1:00:00 # walltime, abbreviated by -t
+#SBATCH --nodes=1      # number of cluster nodes, abbreviated by -N
+#SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)
+#SBATCH -e slurm-%j.err-%N # name of the stderr, using job and first node values
+#SBATCH --ntasks=1    # number of MPI tasks, abbreviated by -n
+# additional information for allocated clusters
+#SBATCH --account=lvanderl     # account - abbreviated by -A
+#SBATCH --partition=lonepeak  # partition, abbreviated by -p
+
 module load R
 Rscript -e 'source("~/LRRsims/BatchScripts/test.R")'
