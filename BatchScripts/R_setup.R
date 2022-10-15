@@ -1,4 +1,4 @@
-.libPaths( c( .libPaths(), "~/Rlibs2") )
+.libPaths( c( "~/Rlibs2", .libPaths()) )
 setwd("~/LRRsims")
 print(getwd())
 nsims = 2500

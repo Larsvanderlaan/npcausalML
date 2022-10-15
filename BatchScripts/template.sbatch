@@ -7,4 +7,4 @@
 #SBATCH --cpus-per-task=1
 
 module load R
-Rscript -e 'source("~/LRRsims/BatchScripts/test.R")'
+Rscript -e ' source("~/LRRsims/BatchScripts/test.R")'

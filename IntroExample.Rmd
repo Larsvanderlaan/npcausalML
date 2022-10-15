@@ -103,7 +103,7 @@ EY0W_est_full <- initial_likelihood$EY0W_full
   
  
 
-  
+  lrnr_names <- colnames(fit_npcausalML$cv_predictions)
  data <- data.table(CATE = unlist(fit_npcausalML$full_predictions), CATE_cv =unlist(fit_npcausalML$cv_predictions),  lrnr = rep(lrnr_names, each = n) , Method = "EP")
     data <- rbind(data,data.table(CATE = unlist(CATEonestepbench), CATE_cv = unlist(CATEonestepbench_cv), lrnr = rep(names(CATEonestepbench_cv), each = n) , Method = "DR"))
     
@@ -133,11 +133,14 @@ EY0W_est_full <- initial_likelihood$EY0W_full
    
  
 data <- as.data.frame(data)
+data$Method[data$Method == "EP"] <- "EP-Learner"
+data$Method[data$Method == "DR"] <- "DR-Learner"
+
 data$X <- W1
  data_1 <- data[data$Tuning %in% c(paste0("Max Depth = ", c(1,2,4,7))),]
  data_cv <-  data[data$Tuning %in% c(paste0("CV-Selected Max Depth")),]
   
- as.data.table(data)[, mean((CATE_est -  data_big$CATE)^2), by = c("Method", "Tuning")]
+# as.data.table(data)[, mean((CATE_est -  data_big$CATE)^2), by = c("Method", "Tuning")]
  library(ggplot2)
 p<- ggplot(data_1)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
   theme(legend.position="none")+ scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))  +  scale_size_manual(  values=c(0.5,0.75, 0.4) )
