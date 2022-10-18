@@ -2,7 +2,7 @@ library(SuperLearner)
 library(npcausalML)
 library(future)
 library(sl3)
-#plan(cluster, workers = 3)
+ plan(cluster, workers = 3)
 source("./FinalSimulationCode/simCATE.R")
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
@@ -91,7 +91,7 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 10),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 10), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 10), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 10),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 10) )
-  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error))
+  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error),folds = origami::folds_vfold(length(A), 2))
 
 
   lrnr_rf <- list(Lrnr_ranger$new(
@@ -103,7 +103,7 @@ onesim <- function(n) {
     Lrnr_ranger$new(
       max.depth = 9, name = "Lrnr_rf_9_xg"))
 
-  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error))
+  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error),folds = origami::folds_vfold(length(A), 2))
 
 
   CATE_library <- c(lrnr_rf,   lrnr_xg  )
@@ -112,7 +112,7 @@ onesim <- function(n) {
 
 
   subst_compare <- Stack$new(CATE_library_subst)
-  subst_compare_trained <- subst_compare$train(taskY)
+  #subst_compare_trained <- subst_compare$train(taskY)
   subst_EY1W_trained <-subst_compare$train(taskY1[A==1]$next_in_chain(covariates = c("W1", "W2", "W3")))
   subst_EY0W_trained <- subst_compare$train(taskY0[A==0]$next_in_chain(covariates = c("W1", "W2", "W3")))
 
@@ -124,9 +124,9 @@ onesim <- function(n) {
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
   print("initial CATE")
   t <- Sys.time()
-  fit_npcausalML <- EP_learn(CATE_library,V = data.frame(W1=W$W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
+  fit_npcausalML <- EP_learn(CATE_library,V = data.frame(W1=W$W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 2)
   print(  Sys.time() - t)
-
+print("npcausal")
 
   preds <- fit_npcausalML$full_predictions
 
