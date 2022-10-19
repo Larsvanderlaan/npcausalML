@@ -10,11 +10,40 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
-n = 300
-W <- rcauchy(n, scale = 0.25)
-pi0 <- plogis(W)
-hist(pi0)
-quantile(pi0)
+library(data.table)
+library(kableExtra)
+set.seed(12345)
+n = 10
+W1 <- rt(n, df = 5)
+pi0 <- plogis(W1  )
+ pi <- ifelse(A==1, pi0, 1-pi0)
+A <- rbinom(n, 1, pi0)
+mu0 = pmin(0.35 + 0.7*plogis( W1-2 ),0.999)
+mu1 <- pmax(mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.35, 0.001)
+mu0 =  0.35 + 0.65*plogis( W1-2 ) 
+mu1 <- mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.349 
+mu <- ifelse(A==1, mu1, mu0)
+Y <- rbinom(n, 1, mu)
+theta <- W1
+betas <- seq(-2,2, length = 100)
+risks <- sapply(betas, function(a) {
+  theta <- a * theta
+  loss <- (mu1 + mu0 +1/pi*(Y - mu))*log(1 + exp(theta)) - (mu1 + A/pi0*(Y - mu1))*theta
+  mean(loss, na.rm = T)
+  
+})
+weights <- round( (mu1 + mu0 + 1/pi*(Y - mu)),2)
+outcome <- round((mu1  + A/pi0*(Y - mu1)) / weights,2)
+quantile(weights)
+quantile(outcome)
+plot(betas, risks)
+dat <- data.frame(Covariate = round(W1,3), Weight  = weights, Outcome = outcome)
+dat[1:5,]
+kab <- kableExtra::kable(dat, booktabs = TRUE) %>% kableExtra::kable_styling(latex_options = c("striped", "hold_position", "scale_down"))
+
+glm(Outcome ~ Covariate, family = "binomial", weights = weights, data = dat)
+glm(Outcome ~ Covariate, family = "binomial", weights = pmax(weights,0), data = dat)
+
 ```
 
 
