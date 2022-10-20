@@ -4,8 +4,9 @@ ns <- c(  5000, 10000, 500, 1000, 2500)
 ns <- sort(ns)
 hard_list <-   c(T,F)
 pos_list <-  c(T,F)
+nsims<- 1000
 use_oracle_sieve <- F
-plan(cluster, workers = 3)
+
 for(pos in pos_list){
   for(hard in hard_list) {
     try({

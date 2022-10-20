@@ -3,6 +3,7 @@ library(npcausalML)
 library(future)
 source("./FinalSimulationCode/simCATEHighDim.R")
 #plan( cluster = 10, workers = 3, globals = TRUE)
+nsims<- 1000
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
   SuperLearner::SL.gam(Y, X, newX, family, obsWeights, deg.gam, cts.num,... )
@@ -84,7 +85,7 @@ onesim <- function(n) {
 
   data_train <-  data #as.data.frame(sim.CATE(n, hard, pos))
 
-  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,grep("W", colnames(data_train))], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 5)
+  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,grep("W", colnames(data_train))], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 2)
   data1 <- data
   data0 <- data
   data1$A <- 1
@@ -103,7 +104,7 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   lrnr_gam <- list(   lrnr_gam1, lrnr_gam2, lrnr_gam3, lrnr_gam4, lrnr_gam5 )
-  lrnr_gam_sl <-  Lrnr_sl$new(lrnr_gam, metalearner = Lrnr_cv_selector$new(loss_squared_error), folds = origami::folds_vfold(length(A), 2))
+  lrnr_gam_sl <-  Lrnr_sl$new(lrnr_gam, metalearner = Lrnr_cv_selector$new(loss_squared_error))
 
 
   lrnr_lm <- list(Lrnr_earth$new(), Lrnr_glm$new())
@@ -112,13 +113,15 @@ onesim <- function(n) {
 
   CATE_library <- c(lrnr_gam,   lrnr_lm  )
 
+
   CATE_library_subst <- c(CATE_library ,list(lrnr_gam_sl  ))
 
 
   subst_compare <- Stack$new(CATE_library_subst)
+  print("start")
    subst_EY1W_trained <-subst_compare$train(taskY1[A==1]$next_in_chain(covariates = grep("W[0-9]+", colnames(data), value = T)))
   subst_EY0W_trained <- subst_compare$train(taskY0[A==0]$next_in_chain(covariates = grep("W[0-9]+", colnames(data), value = T)))
-
+print("END")
   subst_EY1W <-subst_EY1W_trained$predict(taskY1$next_in_chain(covariates = grep("W[0-9]+", colnames(data), value = T)))
   subst_EY0W <- subst_EY0W_trained$predict(taskY0$next_in_chain(covariates = grep("W[0-9]+", colnames(data), value = T)))
   subst_CATE <- subst_EY1W - subst_EY0W #subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0)

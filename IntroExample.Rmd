@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(data.table)
 library(kableExtra)
 set.seed(12345)
-n = 10
+n = 5
 W1 <- rt(n, df = 5)
 pi0 <- plogis(W1  )
  pi <- ifelse(A==1, pi0, 1-pi0)
@@ -41,8 +41,7 @@ dat <- data.frame(Covariate = round(W1,3), Weight  = weights, Outcome = outcome)
 dat[1:5,]
 kab <- kableExtra::kable(dat, booktabs = TRUE) %>% kableExtra::kable_styling(latex_options = c("striped", "hold_position", "scale_down"))
 
-glm(Outcome ~ Covariate, family = "binomial", weights = weights, data = dat)
-glm(Outcome ~ Covariate, family = "binomial", weights = pmax(weights,0), data = dat)
+ 
 
 ```
 

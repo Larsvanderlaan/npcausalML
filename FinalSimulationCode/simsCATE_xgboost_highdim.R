@@ -2,7 +2,7 @@ library(SuperLearner)
 library(npcausalML)
 library(future)
 library(sl3)
-
+nsims<- 1000
 source("./FinalSimulationCode/simCATEHighDim.R")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 1
@@ -104,7 +104,7 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 20),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 20), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 20), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 20),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 20))#,   Lrnr_xgboost$new(max_depth = 6, verbosity = 0, nrounds = 20) )
-  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error),folds = origami::folds_vfold(length(A), 2))
+  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error) )
 
 
   lrnr_rf <- list(Lrnr_ranger$new(
@@ -116,7 +116,7 @@ onesim <- function(n) {
    # Lrnr_ranger$new(
     #  max.depth = 9, name = "Lrnr_rf_9_xg"))
 
-  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error), folds = origami::folds_vfold(length(A), 2))
+  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error))
 
 
   CATE_library <- c(lrnr_rf,   lrnr_xg  )
