@@ -49,25 +49,43 @@ kab <- kableExtra::kable(dat, booktabs = TRUE) %>% kableExtra::kable_styling(lat
 ```{r}
  
  
- 
-library(sl3)
-n = 1500
-W1 <- rt(n, df = 5)
-pi0 <- plogis(W1  )
- 
-A <- rbinom(n, 1, pi0)
-mu0 = pmin(0.35 + 0.7*plogis( W1-2 ),0.999)
-mu1 <- pmax(mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.35, 0.001)
-mu0 =  0.35 + 0.65*plogis( W1-2 ) 
-mu1 <- mu0 + plogis(2*W1+2) - plogis( W1-2) - 0.349 
-mu <- ifelse(A==1, mu1, mu0)
-Y <- rbinom(n, 1, mu)
-quantile(mu1)
-quantile(mu0)
- quantile(mu1 - mu0 )
- 
- zeta0 <- mu1 - mu0 + (2*A-1) / ifelse(A==1, pi0, 1-pi0) * (Y-mu)
-data_big <- data.frame(W1, A, Y, zeta0, CATE = mu1 - mu0)
+
+
+DR_learner <- function(CATE_library, W, A, Y, EY1W, EY0W, pA1W, lrnr_A, lrnr_Y) {
+  if(missing(EY1W)) {
+    data <-data.table(W,A,Y)
+    covariates <- colnames(W)
+    task_A <- sl3_Task$new(data, covariates = covariates, outcome = "A")
+    task_Y <- sl3_Task$new(data, covariates = c(covariates, "A"), outcome = "Y")
+    data1 <- data
+    data1$A <- 1
+    task_Y1 <- sl3_Task$new(data, covariates = c(covariates, "A"), outcome = "Y")
+    data0 <- data
+    data0$A <- 0
+    task_Y0 <- sl3_Task$new(data, covariates = c(covariates, "A"), outcome = "Y")
+    lrnr_Y <- lrnr_Y$train(task_Y)
+    lrnr_A <- lrnr_A$train(task_A)
+    pA1W <- lrnr_A$predict(task_A)
+    EY1W <- lrnr_Y$predict(task_Y1)
+    EY0W <- lrnr_Y$predict(task_Y0)
+    pA1W <- pmax(pmin(pA1, 0.98), 0.02)
+  }
+  EY <- ifelse(A==1, EY1W, EY0W)
+  pA0 <- 1- pA1W
+  Ytilde <- EY1W - EY0W + (A/pA1W - (1-A)/pA0)*(Y - EY)
+
+  data <- data.table(W, Y=Ytilde)
+  task_onestep <- sl3_Task$new(data, covariates = colnames(W), outcome = "Y")
+  lrnr <- Stack$new(CATE_library)
+  lrnr_1 <- lrnr$train(task_onestep)
+  CATEonestep <- lrnr_1$predict(task_onestep)
+  return(CATEonestep)
+}
+
+
+
+
+
 ```
 
 
@@ -106,6 +124,11 @@ EY0W_est <- initial_likelihood$EY0W
 pA1W_est <- initial_likelihood$pA1W
  EY1W_est_full <- initial_likelihood$EY1W_full
 EY0W_est_full <- initial_likelihood$EY0W_full
+
+T_learner <- initial_likelihood$internal$sl3_Learner_EYAW_trained$fit_object$full_fit$fit_object$learner_fits$Stack
+T_learner_preds <- T_learner$predict(initial_likelihood$internal$task_EY1W) - T_learner$predict(initial_likelihood$internal$task_EY0W)
+ T_learner <- initial_likelihood$internal$sl3_Learner_EYAW_trained$fit_object$cv_fit
+T_learner_preds_cv <- T_learner$predict(initial_likelihood$internal$task_EY1W) - T_learner$predict(initial_likelihood$internal$task_EY0W)
  
  
 
@@ -135,14 +158,18 @@ EY0W_est_full <- initial_likelihood$EY0W_full
  data <- data.table(CATE = unlist(fit_npcausalML$full_predictions), CATE_cv =unlist(fit_npcausalML$cv_predictions),  lrnr = rep(lrnr_names, each = n) , Method = "EP")
     data <- rbind(data,data.table(CATE = unlist(CATEonestepbench), CATE_cv = unlist(CATEonestepbench_cv), lrnr = rep(names(CATEonestepbench_cv), each = n) , Method = "DR"))
     
+    data <- rbind(data,data.table(CATE = unlist(T_learner_preds), CATE_cv = unlist(T_learner_preds_cv), lrnr = rep(names(T_learner_preds), each = n) , Method = "T-Learner"))
+     
+    
   data$sieve <- str_match(data$lrnr, "fourier_basis_([0-9])")[,2]
   data$depth <- str_match(data$lrnr, "ranger_500_TRUE_none_1_30_([0-9])")[,2]
   data$lrnr <- NULL
   data[, cv_risks := risk_fun(CATE_cv), by = c("Method", "sieve", "depth")]
   data[, best_sieve := sieve[which.min(cv_risks)], by = c("Method",  "depth")]
   data$best_sieve[data$Method=="DR"] <- "DR"
+  data$best_sieve[data$Method=="T-Learner"] <- "T-Learner"
   
-  data <- data[sieve == best_sieve | Method == "DR",]
+  data <- data[sieve == best_sieve | Method %in% c("DR", "T-Learner"),]
   data[, best_depth_cv := depth[which.min(cv_risks)], by = c("Method")]
   data_cv <- data[depth == best_depth_cv, c("CATE", "Method", "depth"), with = F]
   data_cv$depth = "CV-Selected Max Depth"
@@ -170,12 +197,37 @@ data$X <- W1
   
 # as.data.table(data)[, mean((CATE_est -  data_big$CATE)^2), by = c("Method", "Tuning")]
  library(ggplot2)
-p<- ggplot(data_1)   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
+p<- ggplot(data_1[data_1$Method!="T-Learner",])   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
   theme(legend.position="none")+ scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))  +  scale_size_manual(  values=c(0.5,0.75, 0.4) )
 ggsave(file = "boundViol.pdf", width = 9, height = 4)
 
+ 
+p<- ggplot(data_1[data_1$Method!="EP-Learner",])   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
+  theme(legend.position="none")+ scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))  +  scale_size_manual(  values=c(0.5,0.75, 0.4) )
+ggsave(file = "boundViolNoEP.pdf", width = 9, height = 4)
+
+
+p<- ggplot(data_1[data_1$Method!="EP-Learner"& data_1$Tuning=="Max Depth = 1",])   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1,5),-1), color = Method, linetype = Method ,size = Method) )  + scale_x_continuous(limits=c(-3,3)) + labs(x = "Covariate (W)", y = "CATE")  + scale_y_continuous(limits = c(-1, 1) ) + theme_bw() + facet_grid(~ Tuning )+ scale_colour_manual(values = c("red", "blue", "black")) +
+  theme(legend.position="none")+ scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))  +  scale_size_manual(  values=c(0.5,0.75, 0.4) )
+ggsave(file = "boundViolNoEP_1.pdf", width = 9, height = 4)
+
+
+
+
+
 
  
+p<-ggplot(data_cv[data_cv$Method != "EP-Learner",])   + geom_line(aes(x = X, y = pmax(pmin(CATE_est,1.1,5),-1.1), color = Method, linetype = Method ), size = 1) + scale_x_continuous(limits=c(-3,3))  + labs(x = "Covariate (W)", y = "CATE")  + theme_bw()+ scale_colour_manual(values = c("red", "blue",   "black"))  + theme(legend.margin=margin(t=0, r=1, b=-1.5, l=1, unit="cm")) + scale_y_continuous(limits = c(-0.5, 0.5)) + facet_grid(~ Tuning )+
+  theme(legend.key.size = unit(1.5, 'cm'), #change legend key size
+        legend.key.height = unit(1.5, 'cm'), #change legend key height
+        legend.key.width = unit(1.5, 'cm'), #change legend key width
+        legend.title =  element_blank(), #change legend title font size
+        legend.text = element_text(size=13), 
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20)) + scale_linetype_manual(values=c("dashed", "dotdash",   "solid"))
+ggsave(file = "boundViol_cv_noEP.pdf", width = 9, height =5)
+
+
  
 
 

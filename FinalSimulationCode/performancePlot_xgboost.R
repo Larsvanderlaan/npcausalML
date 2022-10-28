@@ -9,8 +9,8 @@ for(pos in pos_list){
   for(hard in hard_list) {
     try({
     sims_list <- lapply(ns, function(n) {
-      try({load(paste0("mainSimResults/simsCATE", hard, pos,  "n", n, "_xgboost"))
-      simresults <- get(paste0("simresults", n))
+      try({load(paste0("mainSimResults/mainSimResults/simsCATE", hard, pos,  "n", n, "_xgboost"))
+      simresults <- get(paste0("simresults"))
       onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbenchoracle")))
       onestepbench  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbench")))
 
