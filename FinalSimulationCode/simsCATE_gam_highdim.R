@@ -138,8 +138,8 @@ print("Jrtr")
   # Compute least-squares risk of predictions using oracle loss function.
   risks_oracle <- as.vector(apply(preds, 2, function(theta) {
     mean((theta -  CATE)^2)
-  })[grep("plugin", colnames(preds))])
-
+  }) )
+  print(risks_oracle)
   # Compute estimated cross-validated one-step risk of predictions
   cvrisksDR <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {
     loss <- efficient_loss_function_CATE(W, theta, A, Y, EY1W_est,EY0W_est, pA1W_est )

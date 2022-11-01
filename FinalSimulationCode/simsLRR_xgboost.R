@@ -3,6 +3,7 @@ library(sl3)
 library(future)
 library(npcausalML)
 source("FinalSimulationCode/simRR.R")
+nsims = 1000
 
 library(earth)
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
@@ -105,7 +106,7 @@ onesim <- function(n) {
 
 
   lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 10, objective = "reg:logistic"),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 10, objective = "reg:logistic"), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 10, objective = "reg:logistic"), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 10, objective = "reg:logistic"),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 10, objective = "reg:logistic" ))
-  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_loglik_binomial))
+  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_loglik_binomial),folds = origami::folds_vfold(length(A), 2))
 
 
   lrnr_rf <- list(Lrnr_xgboost$new(
@@ -131,7 +132,7 @@ onesim <- function(n) {
       lambda=0,
       colsample_bytree = 0.5,
       num_parallel_tree = 500,
-      verbosity = 0, name = "Lrnr_rf_7_xg", objective = "reg:logistic"),
+      verbosity = 0, name = "Lrnr_rf_9_xg", objective = "reg:logistic"),
     Lrnr_xgboost$new(
       max_depth = 7, nrounds = 1,
       subsample = 0.5,
@@ -139,10 +140,10 @@ onesim <- function(n) {
       lambda=0,
       colsample_bytree = 0.5,
       num_parallel_tree = 500,
-      verbosity = 0, name = "Lrnr_rf_11_xg", objective = "reg:logistic") )
+      verbosity = 0, name = "Lrnr_rf_7_xg", objective = "reg:logistic") )
 
 
-  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_loglik_binomial))
+  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_loglik_binomial),folds = origami::folds_vfold(length(A), 2))
 
 
 
@@ -172,7 +173,7 @@ onesim <- function(n) {
 
     print("EP")
 
-  fit_npcausalML <- EP_learn(LRR_library,V =  data.frame(W = W$W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_LRR, cross_validate = TRUE, nfolds = 5)
+  fit_npcausalML <- EP_learn(LRR_library,V =  data.frame(W = W$W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_LRR, cross_validate = TRUE, nfolds = 2)
   preds <- fit_npcausalML$full_predictions
 print("done")
 
