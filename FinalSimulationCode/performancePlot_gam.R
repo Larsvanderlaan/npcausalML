@@ -11,6 +11,8 @@ for(pos in pos_list){
     sims_list <- lapply(ns, function(n) {
       try({load(paste0("mainSimResults/mainSimResults/simsCATE", hard, pos,  "n", n, "_gam"))
       simresults <- get(paste0("simresults" ))
+      simresults <- simresults[sapply(simresults, is.list)]
+
       onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbenchoracle")))
       onestepbench  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbench")))
 
@@ -162,7 +164,11 @@ for(pos in pos_list){
 
 
 
-      dt_tmp[(dt_tmp$type == "Sieve-Plugin"),"type"] <- "Sieve-Plugin (*)"
+    dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
+    dt_tmp[(dt_tmp$type == "Sieve-Plugin"),"type"] <- "EP-Learner (*)"
+    dt_tmp[(dt_tmp$type == "One-step"),"type"] <- "DR-Learner"
+    dt_tmp[(dt_tmp$type == "Oracle one-step"),"type"] <- "Oracle DR-Learner"
+    dt_tmp[(dt_tmp$type == "Substitution-CV"),"type"] <- "T-Learner (CV)"
 
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line(size = 0.5) +
       facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = c(min(1e-1, min(dt_tmp$risks_best)), max(dt_tmp$risks_best)))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
@@ -185,7 +191,10 @@ for(pos in pos_list){
     keep <- dt_tmp$lrnr %in% c("MARS (earth)", "GAM (s=1)", "GAM (s=3)", "GAM (s=cv)")
     dt_tmp <- dt_tmp[keep,]
     dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
-    dt_tmp[(dt_tmp$type == "Sieve-Plugin"),"type"] <- "Sieve-Plugin (*)"
+    dt_tmp[(dt_tmp$type == "Sieve-Plugin"),"type"] <- "EP-Learner (*)"
+    dt_tmp[(dt_tmp$type == "One-step"),"type"] <- "DR-Learner"
+    dt_tmp[(dt_tmp$type == "Oracle one-step"),"type"] <- "Oracle DR-Learner"
+    dt_tmp[(dt_tmp$type == "Substitution-CV"),"type"] <- "T-Learner (CV)"
 
 
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line(size = 0.5) +

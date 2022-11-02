@@ -3,7 +3,7 @@ library(sl3)
 library(future)
 library(npcausalML)
 source("FinalSimulationCode/simRR.R")
-nsims = 1000
+
 
 library(earth)
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
@@ -38,8 +38,6 @@ list_of_sieves_uni   <- list(
 
 
 
-hard <- F
-pos <- F
 
 onesim <- function(n) {
 
@@ -246,50 +244,17 @@ print("done")
 
   list(risk_subst_cv = risk_subst_cv, risk_IPW = risk_IPW,  risk_subst = risk_subst,    sieve =data.frame(sieve_names, cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
-hard_list <- pos_list <- c(F,T)
 
-for(hard in hard_list) {
-  for(pos in pos_list) {
 
-print(250)
-simresults250 <- lapply(1:nsims, function(i){
+hard <- hard == "TRUE"
+pos <- pos == "TRUE"
+n <- as.numeric(n)
+
+simresults <- lapply(1:nsims, function(i){try({
   print(i)
-  onesim(250)
+  onesim(n)
 })
-
-save(simresults250, file = paste0("mainSimResults/","simsLRR_xgboost_", hard,pos, "n250"))
-
-
-print(500)
-simresults500 <- lapply(1:nsims, function(i){
-  print(i)
- onesim(500)
 })
-
-save(simresults500, file = paste0("mainSimResults/","simsLRR_xgboost_", hard,pos, "n500"))
-
-print(1000)
-simresults1000 <- lapply(1:nsims, function(i){
-  print(i)
-  onesim(1000)
-})
-
-save(simresults1000, file = paste0("mainSimResults/","simsLRR_xgboost_", hard,pos, "n1000"))
-
-print(2500)
-simresults2500 <- lapply(1:nsims, function(i){
-  print(i)
-  onesim(2500)
-})
-
-save(simresults2500, file = paste0("mainSimResults/","simsLRR_xgboost_", hard,pos, "n2500"))
+save(simresults, file = paste0("mainSimResults/","simsLRR", hard,pos, "n", n, "_xgboost"))
 
 
-print(5000)
-simresults5000 <- lapply(1:nsims, function(i){
-  print(i)
-  onesim(5000)
-})
-
-save(simresults5000, file = paste0("mainSimResults/","simsLRR_xgboost_", hard,pos, paste0("n5000")))
-}}
