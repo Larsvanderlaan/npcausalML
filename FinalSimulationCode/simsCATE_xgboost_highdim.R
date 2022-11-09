@@ -230,5 +230,5 @@ simresults <- lapply(1:nsims, function(i){try({
   onesim(n)
 })
 })
-#save(simresults, file = paste0("mainSimResults/","simsCATE", hard,pos, "n", n, "_xgboost_highDim"))
+save(simresults, file = paste0("mainSimResults/","simsCATE", hard,pos, "n", n, "_xgboost_highDim"))
 

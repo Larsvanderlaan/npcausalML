@@ -1,20 +1,21 @@
 library(ggplot2)
 library(data.table)
-ns <- c(  5000, 250, 500, 1000, 2500)
+ns <- c(  500, 1000, 2500, 5000)
+
 ns_label <- ns
 names(ns_label) <- ns
 ns <- sort(ns)
 hard_list <-  c(T,F)
 pos_list <-  c(T,F)
 use_oracle_sieve <- F
-for(pos in pos_list){
+ for(pos in pos_list){
   for(hard in hard_list) {
     try({
     sims_list <- lapply(ns, function(n) {
      # try({load(paste0("mainSimResults/simsLRR_GAM_", hard, pos,  "n", n, "_3"))})
-
-        load(paste0("mainSimResults/simsLRR_GAM_", hard, pos,  "n", n))
-      simresults <- get(paste0("simresults", n))
+      try({
+        load(paste0("mainSimResults/mainSimResults/simsLRR", hard, pos,  "n", n,"_gam"))
+      simresults <- get(paste0("simresults"))
       cvsubstrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst_cv")))
 
         ipwrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_IPW")))
@@ -147,6 +148,7 @@ for(pos in pos_list){
       return(dt2)
     })
 
+      sims_list <- sims_list[sapply(sims_list, is.data.frame)]
 
     dt <- rbindlist(sims_list)
     dt <- dt[-grep("glm", dt$lrnr)]
@@ -162,7 +164,7 @@ for(pos in pos_list){
     ggsave(paste0("mainSimResults/performancePlot_GAM_LRR_", "pos=",pos, "hard=",hard, ".pdf"), width = 8, height = 7)
 
 
-
+})
 
 
 })

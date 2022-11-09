@@ -3,6 +3,7 @@ library(sl3)
 library(future)
 library(npcausalML)
 source("FinalSimulationCode/simRR.R")
+nsims = 1000
 
 
 library(earth)

@@ -3,7 +3,7 @@ library(SuperLearner)
 library(future)
 library(npcausalML)
 source("FinalSimulationCode/simRR.R")
-nsims = 5000
+nsims = 1000
 
 library(earth)
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
