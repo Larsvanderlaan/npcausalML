@@ -21,7 +21,9 @@ use_oracle_sieve <- F
         ipwrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_IPW")))
 
       substrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst")))
-
+  if(is.na(substrisks[length(substrisks)])) {
+    substrisks[length(substrisks)] <- substrisks[1]
+  }
 
 
       lrnr_names <- names(simresults[[1]]$risk_IPW) #simresults[[1]]$sieve[[1]]
@@ -147,6 +149,7 @@ use_oracle_sieve <- F
       dt2$n <- n
       return(dt2)
     })
+    })
 
       sims_list <- sims_list[sapply(sims_list, is.data.frame)]
 
@@ -154,8 +157,12 @@ use_oracle_sieve <- F
     dt <- dt[-grep("glm", dt$lrnr)]
     s <- stringr::str_match(dt$lrnr, "s(.+)_")[,2]
     dt$lrnr <- paste0("gam (s=", s, ")")
+    dt <- dt[s %in% c("1", "3", "5", "cv"),]
     dt_tmp<-dt
+    dt_tmp[(dt_tmp$type == "sieve"),"type"] <- "EP-Learner (*)"
 
+    dt_tmp[(dt_tmp$type == "Substitution"),"type"] <- "T-Learner"
+    dt_tmp <- dt_tmp[(dt_tmp$type != "xgboost-Ensemble"), ]
 
 
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
@@ -164,7 +171,7 @@ use_oracle_sieve <- F
     ggsave(paste0("mainSimResults/performancePlot_GAM_LRR_", "pos=",pos, "hard=",hard, ".pdf"), width = 8, height = 7)
 
 
-})
+
 
 
 })
