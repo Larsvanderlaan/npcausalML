@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-ns <- c(  5000, 250, 500, 1000, 2500)
+ns <- c(  5000,  500, 1000, 2500)
 ns <- sort(ns)
 hard_list <-  c(T,F)
 pos_list <-  c(T,F)
@@ -9,11 +9,10 @@ for(pos in pos_list){
   for(hard in hard_list) {
     try({
     sims_list <- lapply(ns, function(n) {
-      try({load(paste0("mainSimResults/simsLRR_xgboost_", hard, pos,  "n", n, "_3"))})
-      try({      load(paste0("mainSimResults/simsLRR_xgboost_", hard, pos,  "n", n))
-})
+      try({load(paste0("mainSimResults/mainSimResults/simsLRR", hard, pos,  "n", n, "_xgboost"))})
 
-      simresults <- get(paste0("simresults", n))
+
+      simresults <- get(paste0("simresults"))
       ipwrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_IPW")))
 
        substrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst")))
@@ -138,13 +137,18 @@ for(pos in pos_list){
 
     options(repr.plot.width=20, repr.plot.height=10)
 
+    dt[(dt$type == "sieve"),"type"] <- "EP-Learner (*)"
+    dt[(dt$type == "ipw"),"type"] <- "IPW"
+    dt[(dt$type == "subst"),"type"] <- "T-Learner"
+    dt <- dt[(dt$type != "xgboost-Ensemble"), ]
+
 
     dt_tmp<-dt
     dt_tmp <- dt_tmp[ grep("xgboost", dt$lrnr), ]
     max_depth <- stringr::str_match(dt_tmp$lrnr, "xgboost_10_1_([0-9]+)")[,2]
     max_depth[is.na(max_depth)] <- "cv"
     dt_tmp$lrnr <- paste0("xgboost (", "max_depth=", max_depth,")")
-    dt_tmp <- dt_tmp[max_depth %in% c("1", "2", "3", "6", "cv"),]
+    dt_tmp <- dt_tmp[max_depth %in% c("1", "2", "4", "6", "cv"),]
     dt_tmp <- rbind(dt_tmp, dt[grep("causalforest", dt$lrnr),])
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
       facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))

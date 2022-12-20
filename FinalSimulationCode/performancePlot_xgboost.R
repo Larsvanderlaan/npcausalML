@@ -243,6 +243,33 @@ for(pos in pos_list){
 
 
 
+      for(lrnr in dt$lrnr) {
+        dt <- as.data.frame(dt)
+        dt <- dt[dt$type != "Oracle DR-Learner",]
+        dt_tmp <- dt
+        plt <- ggplot(dt[dt$lrnr %in% lrnr,], aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line(size = 0.5)  + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = c(min(1e-1, min(dt_tmp$risks_best)), max(dt_tmp$risks_best)))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000)) +
+          facet_wrap(~lrnr, scales = "free")
+        plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw() + labs(color = "Method", group = "Method", linetype = "Method")
+        plt <- plt +  theme_bw() + theme(axis.text=element_text(size=12),
+                                         legend.text=element_text(size=12),
+                                         legend.title=element_text(size=12),
+                                         axis.title=element_text(size=14,face="bold"))
+        plt <- plt + theme(legend.justification = c(0.6, 0), legend.position = c(0.75, 0.6))
+        #plt <- plt +  scale_colour_manual(labels = c("Causal-Forest", "DR-Learner", "EP-Learner (*)", "T-Learner (CV)" ), values =   c("#619CFF", "#00BA38", "#F8766D", "#E76BF3"))
+        #plt <- plt + scale_linetype_manual(labels = c("Causal-Forest", "DR-Learner", "EP-Learner (*)", "T-Learner (CV)" ), values = c("longdash" ,"dashed" , "solid", "dotted"))
+        labels <- c("Causal-Forest", "DR-Learner", "EP-Learner (*)", "T-Learner (CV)" )
+        colors <- c("#619CFF", "#00BA38", "#F8766D", "#E76BF3")
+        linetypes <- c("longdash" ,"dashed" , "solid", "dotted")
+        names(colors) <- labels
+        names(linetypes) <- labels
+        plt <- plt +  scale_colour_manual(labels = labels, values =   colors)
+        plt <- plt + scale_linetype_manual(labels = labels, values = linetypes)
+        plt <- plt +
+          theme(legend.key.height= unit(0.5, 'cm'),
+                legend.key.width= unit(1, 'cm'))  + theme(legend.position = "none")
+        ggsave(paste0("mainSimResults/plots/performancePlot_CATE_tree_", "pos=",pos, "hard=",hard, "_", lrnr,".pdf"), width = 5, height = 5)
+      }
+
 })
   }
 }
