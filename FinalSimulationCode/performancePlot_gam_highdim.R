@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-ns <- c(  500, 1000, 2500 , 5000, 10000,  250)
+ns <- c(  500, 1000, 2500 , 5000 )
 ns <- sort(ns)
 hard_list <-   c(T,F)
 pos_list <-  c(T,F)
