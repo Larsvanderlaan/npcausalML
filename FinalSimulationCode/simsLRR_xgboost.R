@@ -48,7 +48,6 @@ onesim <- function(n) {
   W <- data[,grep("^W", colnames(data))]
   A <- data$A
   Y <- data$Y
-  W <- data.frame(W=data$W)
   EY1Wtrue <- data$EY1W
   EY0Wtrue <- data$EY0W
   pA1Wtrue <- data$pA1W
@@ -101,11 +100,11 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   data$weightsIPW <- data$Y/ifelse(data$A==1,pA1W_est, 1 - pA1W_est)
-  sl3_Task_IPW <- sl3_Task$new(data, covariates = c("W1", "W2", "W3"), outcome = "A", weights = "weightsIPW")
+  sl3_Task_IPW <- sl3_Task$new(data, covariates = c("W1", "W2", "W3"), outcome = "A", weights = "weightsIPW", folds = 5)
 
 
   lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 10, objective = "reg:logistic"),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 10, objective = "reg:logistic"), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 10, objective = "reg:logistic"), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 10, objective = "reg:logistic"),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 10, objective = "reg:logistic" ))
-  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_loglik_binomial),folds = origami::folds_vfold(length(A), 2))
+  lrnr_xg_sl <-  Lrnr_sl$new(Stack$new(lrnr_xg), metalearner = Lrnr_cv_selector$new(loss_loglik_binomial))
 
 
   lrnr_rf <- list(Lrnr_xgboost$new(
@@ -142,7 +141,7 @@ onesim <- function(n) {
       verbosity = 0, name = "Lrnr_rf_7_xg", objective = "reg:logistic") )
 
 
-  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_loglik_binomial),folds = origami::folds_vfold(length(A), 2))
+  lrnr_rf_sl <-  Lrnr_sl$new(Stack$new(lrnr_rf), metalearner = Lrnr_cv_selector$new(loss_loglik_binomial))
 
 
 
