@@ -137,10 +137,13 @@ for(pos in pos_list){
 
     options(repr.plot.width=20, repr.plot.height=10)
 
-    dt[(dt$type == "sieve"),"type"] <- "EP-Learner (*)"
-    dt[(dt$type == "ipw"),"type"] <- "IPW"
-    dt[(dt$type == "subst"),"type"] <- "T-Learner"
+    dt[(dt$type == "sieve"),"type"] <- "EP-learner (*)"
+    dt[(dt$type == "ipw"),"type"] <- "IPW-learner"
+    dt[(dt$type == "subst"),"type"] <- "T-learner"
+    #dt <- dt[(dt$type != "xgboost-Ensemble"), ]
+
     dt <- dt[(dt$type != "xgboost-Ensemble"), ]
+    # dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
 
 
     dt_tmp<-dt
@@ -150,6 +153,8 @@ for(pos in pos_list){
     dt_tmp$lrnr <- paste0("xgboost (", "max_depth=", max_depth,")")
     dt_tmp <- dt_tmp[max_depth %in% c("1", "2", "4", "6", "cv"),]
     dt_tmp <- rbind(dt_tmp, dt[grep("causalforest", dt$lrnr),])
+    dt_xg <- dt_tmp
+
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
       facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
     plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw() + labs(color = "Method", group = "Method", linetype = "Method")
@@ -159,9 +164,8 @@ for(pos in pos_list){
     dt_tmp <- dt_tmp[grep("rf", dt$lrnr), ]
      max_depth <- stringr::str_match(dt_tmp$lrnr, "([0-9]+)_xg$")[,2]
     max_depth[is.na(max_depth)] <- "cv"
-    dt_tmp$lrnr <- paste0("Random-forest (", "max_depth=", max_depth,")")
+    dt_tmp$lrnr <- paste0("Random forest (", "max_depth=", max_depth,")")
     dt_tmp <- dt_tmp[max_depth %in% c("5", "7", "9", "cv"),]
-    dt_tmp <- rbind(dt_tmp, dt[grep("causalforest", dt$lrnr),])
 
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
       facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
@@ -170,15 +174,56 @@ for(pos in pos_list){
     ggsave(paste0("mainSimResults/performancePlot_ranger_LRR", "pos=",pos, "hard=",hard, ".pdf"), width = 8, height = 7)
 
 
-    # dt_tmp <- dt[(dt$lrnr %in% c("glm", "earth", "gam3", "gam4", "gam5")),]
-    # plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
-    #   facet_wrap(~lrnr, scales = "free") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = range(dt_tmp$risks_best))+  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000))
-    # if(use_oracle_sieve){
-    #   ggsave(paste0("mainSimResults/performancePlotGAMS_oracleSieve", "pos=",pos, "hard=",hard, ".pdf"))
-    # } else {
-    #   ggsave(paste0("mainSimResults/performancePlotGAMS", "pos=",pos, "hard=",hard, ".pdf"))
-    # }
-    # plt
+
+    dt_rf <- dt_tmp
+
+    dt <- rbindlist(sims_list)
+    dt[(dt$type == "sieve"),"type"] <- "EP-learner (*)"
+    dt[(dt$type == "ipw"),"type"] <- "IPW-learner"
+    dt[(dt$type == "subst"),"type"] <- "T-learner"
+
+
+    dt_tmp<-dt
+    dt_tmp <- dt_tmp[ grep("xgboost", dt$lrnr), ]
+    max_depth <- stringr::str_match(dt_tmp$lrnr, "([0-9]+)_0")[,2]
+    max_depth[is.na(max_depth)] <- "cv"
+    dt_tmp$lrnr <- paste0("xgboost (", "max_depth=", max_depth,")")
+    dt_tmp <- dt_tmp[max_depth %in% c("1", "5", "cv"),]
+
+    dt_xg <- dt_tmp
+
+    dt <- rbind( dt_xg,dt_rf)
+    print(head(dt))
+    for(lrnr in unique(dt$lrnr)) {
+      print(lrnr)
+      dt <- as.data.frame(dt)
+      dt <- dt[dt$type != "Oracle DR-Learner",]
+      dt_tmp <- dt
+      plt <- ggplot(dt[dt$lrnr %in% lrnr,], aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line(size = 0.75)  + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = c(min(1e-1, min(dt_tmp$risks_best)), max(dt_tmp$risks_best)))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000)) +
+        facet_wrap(~lrnr, scales = "free")
+      plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw() + labs(color = "Method", group = "Method", linetype = "Method")
+      plt <- plt +  theme_bw() + theme(axis.text=element_text(size=14),
+
+                                       strip.text.x = element_text(size = 16),
+                                       legend.text=element_text(size=12),
+                                       legend.title=element_text(size=12),
+                                       axis.title=element_text(size=12,face="bold"))
+      plt <- plt + theme(legend.justification = c(0.6, 0), legend.position = c(0.75, 0.6))
+      #plt <- plt +  scale_colour_manual(labels = c("Causal-Forest", "DR-Learner", "EP-Learner (*)", "T-Learner (cv)" ), values =   c("#619CFF", "#00BA38", "#F8766D", "#E76BF3"))
+      #plt <- plt + scale_linetype_manual(labels = c("Causal-Forest", "DR-Learner", "EP-Learner (*)", "T-Learner (cv)" ), values = c("longdash" ,"dashed" , "solid", "dotted"))
+      labels <- c( "IPW-learner", "EP-learner (*)", "T-learner" )
+      colors <- c("#619CFF", "#00BA38", "#F8766D", "#E76BF3")[-1]
+      linetypes <- c("longdash" ,"dashed" , "solid", "dotted")[-1]
+      names(colors) <- labels
+      names(linetypes) <- labels
+      plt <- plt +  scale_colour_manual( values =   colors)
+      plt <- plt + scale_linetype_manual ( values = linetypes)
+      plt <- plt +
+        theme(legend.key.height= unit(0.5, 'cm'),
+              legend.key.width= unit(1, 'cm'))  + theme(legend.position = "none")
+      ggsave(paste0("mainSimResults/plots/performancePlot_LRR_tree_", "pos=",pos, "hard=",hard, "_", lrnr,".pdf"), width = 4, height = 4)
+    }
+
 })
   }
 }

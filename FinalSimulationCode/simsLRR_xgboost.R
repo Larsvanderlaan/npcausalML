@@ -82,16 +82,16 @@ onesim <- function(n) {
 
   data_train <-  data #as.data.frame(sim.LRR(n, hard, pos))
 
-  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,c("W"), drop = F], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 10, outcome_type = "continuous")
+  initial_likelihood <- npcausalML:::estimate_initial_likelihood(W=data_train[,c("W1", "W2", "W3"), drop = F], data_train$A, data_train$Y,  weights = rep(1,n), lrnr_A, lrnr_Y, folds = 10, outcome_type = "continuous")
   data1 <- data
   data0 <- data
   data1$A <- 1
   data0$A <- 0
-  taskY <- sl3_Task$new(data, covariates = c("W", "A"), outcome = "Y", folds = origami::folds_vfold(n), outcome_type = "continuous")
+  taskY <- sl3_Task$new(data, covariates = c("W1", "W2", "W3", "A"), outcome = "Y", folds = origami::folds_vfold(n), outcome_type = "continuous")
   folds <- taskY$folds
-  taskY0 <- sl3_Task$new(data0, covariates = c("W", "A"), outcome = "Y", folds = folds, outcome_type = "continuous")
-  taskY1 <- sl3_Task$new(data1, covariates = c("W", "A"), outcome = "Y", folds = folds, outcome_type = "continuous")
-  taskA <- sl3_Task$new(data, covariates = c("W"), outcome = "A", folds = folds)
+  taskY0 <- sl3_Task$new(data0, covariates = c("W1", "W2", "W3", "A"), outcome = "Y", folds = folds, outcome_type = "continuous")
+  taskY1 <- sl3_Task$new(data1, covariates = c("W1", "W2", "W3", "A"), outcome = "Y", folds = folds, outcome_type = "continuous")
+  taskA <- sl3_Task$new(data, covariates = c("W1", "W2", "W3"), outcome = "A", folds = folds)
 
   pA1W_est <- initial_likelihood$internal$sl3_Learner_pA1W_trained$predict(taskA)
   EY1W_est <- initial_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY1)
@@ -101,7 +101,7 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   data$weightsIPW <- data$Y/ifelse(data$A==1,pA1W_est, 1 - pA1W_est)
-  sl3_Task_IPW <- sl3_Task$new(data, covariates = "W", outcome = "A", weights = "weightsIPW")
+  sl3_Task_IPW <- sl3_Task$new(data, covariates = c("W1", "W2", "W3"), outcome = "A", weights = "weightsIPW")
 
 
   lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 10, objective = "reg:logistic"),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 10, objective = "reg:logistic"), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 10, objective = "reg:logistic"), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 10, objective = "reg:logistic"),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 10, objective = "reg:logistic" ))
@@ -159,11 +159,11 @@ onesim <- function(n) {
 
 
   subst_compare <- Stack$new(LRR_library_subst)
-   subst_EY1W_trained <-subst_compare$train(taskY1[A==1]$next_in_chain(covariates = c("W")))
-  subst_EY0W_trained <- subst_compare$train(taskY0[A==0]$next_in_chain(covariates = c("W")))
+   subst_EY1W_trained <-subst_compare$train(taskY1[A==1]$next_in_chain(covariates = c("W1", "W2", "W3")))
+  subst_EY0W_trained <- subst_compare$train(taskY0[A==0]$next_in_chain(covariates = c("W1", "W2", "W3")))
 
-  subst_EY1W <-subst_EY1W_trained$predict(taskY1$next_in_chain(covariates = c("W")))
-  subst_EY0W <- subst_EY0W_trained$predict(taskY0$next_in_chain(covariates = c("W")))
+  subst_EY1W <-subst_EY1W_trained$predict(taskY1$next_in_chain(covariates = c("W1", "W2", "W3")))
+  subst_EY0W <- subst_EY0W_trained$predict(taskY0$next_in_chain(covariates = c("W1", "W2", "W3")))
 
 
   subst_EY1W <- pmax(subst_EY1W, 1e-5)
@@ -172,7 +172,7 @@ onesim <- function(n) {
 
     print("EP")
 
-  fit_npcausalML <- EP_learn(LRR_library,V =  data.frame(W = W$W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_LRR, cross_validate = TRUE, nfolds = 2)
+  fit_npcausalML <- EP_learn(LRR_library,V =  W, A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_LRR, cross_validate = TRUE, nfolds = 2)
   preds <- fit_npcausalML$full_predictions
 print("done")
 
@@ -185,14 +185,14 @@ print("done")
 
   # Compute estimated cross-validated one-step risk of predictions
   cvrisksDR <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {
-    loss <- efficient_loss_function_LRR(W, theta, A, Y, EY1W_est,EY0W_est, pA1W_est )
+    loss <- efficient_loss_function_LRR(theta, A, Y, EY1W_est,EY0W_est, pA1W_est )
     mean(loss)
   }))#[-grep("IPW", colnames(fit_npcausalML$cv_predictions))])
 
   # Compute estimated cross-validated oracle one-step risk of predictions
 
   cvrisksDRoracle <- as.vector(apply(fit_npcausalML$cv_predictions, 2, function(theta) {
-    loss <- efficient_loss_function_LRR(W, theta, A, Y, EY1Wtrue,EY0Wtrue, pA1Wtrue )
+    loss <- efficient_loss_function_LRR(theta, A, Y, EY1Wtrue,EY0Wtrue, pA1Wtrue )
     mean(loss)
   }))#[-grep("IPW", colnames(fit_npcausalML$cv_predictions))])
   lrnrs_full <-  colnames(fit_npcausalML$cv_predictions)

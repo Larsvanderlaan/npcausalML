@@ -20,7 +20,9 @@ estimate_using_ERM(
   weight_function_IPW,
   learning_method = c("plugin", "IPW"),
   Vpred = V,
-  transform_function = function(x) {     x }
+  transform_function = function(x) {
+     x
+ }
 )
 }
 \arguments{

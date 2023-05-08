@@ -9,11 +9,6 @@
 
 \code{\link{R6Class}} object.
 }
-\value{
-
-
-
-}
 \description{
 Object that computes bspline basis matrix
 
@@ -27,15 +22,15 @@ Object that computes Fourier basis matrix
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
-\item \href{#method-new}{\code{fourier_basis$new()}}
-\item \href{#method-set}{\code{fourier_basis$set()}}
-\item \href{#method-eval}{\code{fourier_basis$eval()}}
-\item \href{#method-clone}{\code{fourier_basis$clone()}}
+\item \href{#method-fourier_basis-new}{\code{fourier_basis$new()}}
+\item \href{#method-fourier_basis-set}{\code{fourier_basis$set()}}
+\item \href{#method-fourier_basis-eval}{\code{fourier_basis$eval()}}
+\item \href{#method-fourier_basis-clone}{\code{fourier_basis$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-new"></a>}}
-\if{latex}{\out{\hypertarget{method-new}{}}}
+\if{html}{\out{<a id="method-fourier_basis-new"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{fourier_basis$new(orders = c(3, 0, 0), ...)}\if{html}{\out{</div>}}
@@ -43,8 +38,8 @@ Object that computes Fourier basis matrix
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-set"></a>}}
-\if{latex}{\out{\hypertarget{method-set}{}}}
+\if{html}{\out{<a id="method-fourier_basis-set"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-set}{}}}
 \subsection{Method \code{set()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{fourier_basis$set(X)}\if{html}{\out{</div>}}
@@ -52,8 +47,8 @@ Object that computes Fourier basis matrix
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-eval"></a>}}
-\if{latex}{\out{\hypertarget{method-eval}{}}}
+\if{html}{\out{<a id="method-fourier_basis-eval"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-eval}{}}}
 \subsection{Method \code{eval()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{fourier_basis$eval(X)}\if{html}{\out{</div>}}
@@ -61,8 +56,8 @@ Object that computes Fourier basis matrix
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-clone}{}}}
+\if{html}{\out{<a id="method-fourier_basis-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{
@@ -81,15 +76,15 @@ The objects of this class are cloneable with this method.
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
-\item \href{#method-new}{\code{fourier_basis$new()}}
-\item \href{#method-set}{\code{fourier_basis$set()}}
-\item \href{#method-eval}{\code{fourier_basis$eval()}}
-\item \href{#method-clone}{\code{fourier_basis$clone()}}
+\item \href{#method-fourier_basis-new}{\code{fourier_basis$new()}}
+\item \href{#method-fourier_basis-set}{\code{fourier_basis$set()}}
+\item \href{#method-fourier_basis-eval}{\code{fourier_basis$eval()}}
+\item \href{#method-fourier_basis-clone}{\code{fourier_basis$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-new"></a>}}
-\if{latex}{\out{\hypertarget{method-new}{}}}
+\if{html}{\out{<a id="method-fourier_basis-new"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{fourier_basis$new(orders = c(3, 0, 0), ...)}\if{html}{\out{</div>}}
@@ -97,8 +92,8 @@ The objects of this class are cloneable with this method.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-set"></a>}}
-\if{latex}{\out{\hypertarget{method-set}{}}}
+\if{html}{\out{<a id="method-fourier_basis-set"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-set}{}}}
 \subsection{Method \code{set()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{fourier_basis$set(X)}\if{html}{\out{</div>}}
@@ -106,8 +101,8 @@ The objects of this class are cloneable with this method.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-eval"></a>}}
-\if{latex}{\out{\hypertarget{method-eval}{}}}
+\if{html}{\out{<a id="method-fourier_basis-eval"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-eval}{}}}
 \subsection{Method \code{eval()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{fourier_basis$eval(X)}\if{html}{\out{</div>}}
@@ -115,8 +110,8 @@ The objects of this class are cloneable with this method.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-clone}{}}}
+\if{html}{\out{<a id="method-fourier_basis-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-fourier_basis-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{

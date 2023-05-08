@@ -210,6 +210,10 @@ print("here")
   list(risk_subst_cv = risk_subst_cv, risk_cf = risk_cf, risk_subst = risk_subst, CATEonestepbenchoracle =CATEonestepbenchoracle, CATEonestepbench = CATEonestepbench, sieve =data.frame(sieve_names, cvrisksDRoracle, cvrisksDR, risks_oracle))
 }
 
+# n <- 5000
+# hard <- pos <- F
+# nsims<- 1000
+
 hard <- hard == "TRUE"
 pos <- pos == "TRUE"
 n <- as.numeric(n)

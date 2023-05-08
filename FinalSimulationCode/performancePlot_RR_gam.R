@@ -154,15 +154,23 @@ use_oracle_sieve <- F
       sims_list <- sims_list[sapply(sims_list, is.data.frame)]
 
     dt <- rbindlist(sims_list)
-    dt <- dt[-grep("glm", dt$lrnr)]
+   dt <- dt[-grep("glm", dt$lrnr)]
     s <- stringr::str_match(dt$lrnr, "s(.+)_")[,2]
-    dt$lrnr <- paste0("gam (s=", s, ")")
+    s[is.na(s)] <- "cv"
+    dt$lrnr  <- paste0("GAM (s=", s, ")")
+    #dt$lrnr[grep("glm", dt$lrnr)] <- "GLM"
     dt <- dt[s %in% c("1", "3", "5", "cv"),]
     dt_tmp<-dt
-    dt_tmp[(dt_tmp$type == "sieve"),"type"] <- "EP-Learner (*)"
+   # dt_tmp[(dt_tmp$type == "sieve"),"type"] <- "EP-Learner (*)"
 
-    dt_tmp[(dt_tmp$type == "Substitution"),"type"] <- "T-Learner"
+    #dt_tmp[(dt_tmp$type == "Substitution"),"type"] <- "T-Learner"
     dt_tmp <- dt_tmp[(dt_tmp$type != "xgboost-Ensemble"), ]
+   # dt_tmp <- dt_tmp[!(dt_tmp$type == "Substitution"),]
+    dt_tmp[(dt_tmp$type == "sieve"),"type"] <- "EP-learner (*)"
+    dt_tmp[(dt_tmp$type == "IPW"),"type"] <- "IPW-learner"
+   # dt_tmp[(dt_tmp$type == "Oracle one-step"),"type"] <- "Oracle DR-Learner"
+    dt_tmp[(dt_tmp$type == "xgboost-Ensemble"),"type"] <- "T-learner (CV)"
+    dt_tmp[(dt_tmp$type == "Substitution"),"type"] <- "T-learner"
 
 
     plt <- ggplot(dt_tmp, aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line() +
@@ -170,6 +178,36 @@ use_oracle_sieve <- F
     plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw() + labs(color = "Method", group = "Method", linetype = "Method")
     ggsave(paste0("mainSimResults/performancePlot_GAM_LRR_", "pos=",pos, "hard=",hard, ".pdf"), width = 8, height = 7)
 
+
+    for(lrnr in unique(dt_tmp$lrnr)) {
+      dt_tmp <- as.data.frame(dt_tmp)
+
+      dt_tmp <- dt_tmp[dt_tmp$type != "Oracle DR-Learner",]
+      plt <- ggplot(dt_tmp[dt_tmp$lrnr %in% lrnr,], aes(x = n, y = risks_best, group = type, color = type, linetype = type)) + geom_line(size = 0.75)  + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) + ylab("MSE") + scale_y_log10(limits = c(min(1e-1, min(dt_tmp$risks_best)), max(dt_tmp$risks_best)))  +  scale_x_log10(breaks = c(500, 1000, 2500, 5000, 10000)) +
+        facet_wrap(~lrnr, scales = "free")
+      plt <- plt + xlab("Sample Size (n)") + ylab("Mean-Squared-Error (MSE)") + theme_bw() + labs(color = "Method", group = "Method", linetype = "Method")
+      plt <- plt +  theme_bw() + theme(axis.text=element_text(size=14),
+                                       strip.text.x = element_text(size = 20),
+                                       legend.text=element_text(size=12),
+                                       legend.title=element_text(size=12),
+                                       axis.title=element_text(size=12,face="bold"))
+      #plt <- plt + theme(legend.justification = c(0.1, 0), legend.position = c(0.1, 0.1))
+      labels <- c( "IPW-learner", "EP-learner (*)", "T-learner" )
+      colors <- c("#619CFF", "#00BA38", "#F8766D", "#E76BF3")[-1]
+      linetypes <- c("longdash" ,"dashed" , "solid", "dotted")[-1]
+      names(colors) <- labels
+      names(linetypes) <- labels
+      plt <- plt +  scale_colour_manual(  values =   colors)
+      plt <- plt + scale_linetype_manual(  values = linetypes)
+      plt <- plt + theme(legend.key.size = unit(1.5, 'cm'), legend.title = element_blank(), legend.direction  = "horizontal") #legend.position = "horizontal")
+      ggsave(paste0("mainSimResults/plots/performancePlot_CATE_tree_", "pos=",pos, "hard=",hard, "_", lrnr,".pdf"), width = 10, height = 10)
+
+      plt <- plt +
+        theme(legend.key.height= unit(0.5, 'cm'),
+              legend.key.width= unit(1, 'cm')) + theme(legend.position = "none")
+      ggsave(paste0("mainSimResults/plots/performancePlot_LRR_GAM_", "pos=",pos, "hard=",hard, "_", lrnr,".pdf"), width = 4, height = 4)
+
+    }
 
 
 
