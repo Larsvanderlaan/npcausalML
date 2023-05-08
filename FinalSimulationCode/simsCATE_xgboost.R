@@ -81,7 +81,7 @@ onesim <- function(n) {
   taskY <- sl3_Task$new(data, covariates = c(grep("W", colnames(data_train), value = T), "A"), outcome = "Y", folds = folds)
   taskY0 <- sl3_Task$new(data0, covariates = c(grep("W", colnames(data_train), value = T), "A"), outcome = "Y", folds = folds)
   taskY1 <- sl3_Task$new(data1, covariates = c(grep("W", colnames(data_train), value = T), "A"), outcome = "Y", folds = folds)
-  taskA <- sl3_Task$new(data, covariates = c(grep("W", colnames(data_train), value = T)), outcome = "A", folds = folds)
+  taskA <- sl3_Task$new(data, covariates = c(grep("W", colnames(data_train), value = T)), outcome = "A", folds = 5)
 
   pA1W_est <- initial_likelihood$internal$sl3_Learner_pA1W_trained$predict(taskA)
   EY1W_est <- initial_likelihood$internal$sl3_Learner_EYAW_trained$predict(taskY1)
@@ -91,7 +91,7 @@ onesim <- function(n) {
   pA1W_est <- pmin(pA1W_est, 0.99)
 
   lrnr_xg <- list(    Lrnr_xgboost$new(max_depth = 1, verbosity = 0, nrounds = 10),    Lrnr_xgboost$new(max_depth = 2, verbosity = 0, nrounds = 10), Lrnr_xgboost$new(max_depth = 3, verbosity = 0, nrounds = 10), Lrnr_xgboost$new(max_depth = 4, verbosity = 0, nrounds = 10),   Lrnr_xgboost$new(max_depth = 5, verbosity = 0, nrounds = 10) )
-  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error),folds = origami::folds_vfold(length(A), 2))
+  lrnr_xg_sl <-  Lrnr_sl$new(lrnr_xg, metalearner = Lrnr_cv_selector$new(loss_squared_error))
 
 
   lrnr_rf <- list(Lrnr_ranger$new(
@@ -103,7 +103,7 @@ onesim <- function(n) {
     Lrnr_ranger$new(
       max.depth = 9, name = "Lrnr_rf_9_xg"))
 
-  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error),folds = origami::folds_vfold(length(A), 2))
+  lrnr_rf_sl <-  Lrnr_sl$new(lrnr_rf, metalearner = Lrnr_cv_selector$new(loss_squared_error) )
 
 
   CATE_library <- c(lrnr_rf,   lrnr_xg  )
@@ -124,7 +124,7 @@ onesim <- function(n) {
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
   print("initial CATE")
   t <- Sys.time()
-  fit_npcausalML <- EP_learn(CATE_library,V = data.frame(W1=W$W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 2)
+  fit_npcausalML <- EP_learn(CATE_library,V = data.frame(W1=W$W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
   print(  Sys.time() - t)
 print("npcausal")
 
@@ -217,7 +217,9 @@ print("here")
 hard <- hard == "TRUE"
 pos <- pos == "TRUE"
 n <- as.numeric(n)
-
+if(n==5000) {
+  nsims <- 1000
+}
 simresults <- lapply(1:nsims, function(i){try({
   print(i)
   onesim(n)
