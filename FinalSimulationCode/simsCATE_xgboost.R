@@ -21,7 +21,7 @@ list_of_sieves_uni   <- list(
   fourier_basis$new(orders = c(1,0)),
   fourier_basis$new(orders = c(2,0)),
   fourier_basis$new(orders = c(3,0)),
-  fourier_basis$new(orders = c(4,0))
+  fourier_basis$new(orders = c(1,1))
 )
 
 lrnr_gam3 <- Lrnr_pkg_SuperLearner$new("SL.gam3" )
@@ -226,6 +226,6 @@ simresults <- lapply(1:nsims, function(i){try({
   onesim(n)
 })
 })
-save(simresults, file = paste0("mainSimResults/","simsCATE", hard,pos, "n", n, "_xgboost"))
+save(simresults, file = paste0("mainSimResults2/","simsCATE", hard,pos, "n", n, "_xgboost"))
 
 
