@@ -131,7 +131,7 @@ onesim <- function(n) {
   # apply(subst_EY1W -subst_EY0W , 2, function(p) {mean((p - CATE)^2)})
   # apply(subst_compare_trained$predict(taskY1) - subst_compare_trained$predict(taskY0), 2, function(p) {mean((p - CATE)^2)})
   t <- Sys.time()
-  fit_npcausalML <- EP_learn(CATE_library,V = data.frame(W1=W$W1), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
+  fit_npcausalML <- EP_learn(CATE_library,V = as.data.frame(W), A = A, Y = Y, EY1W = EY1W_est  , EY0W = EY0W_est  , pA1W = pA1W_est, sieve_basis_generator_list = sieve_list ,EP_learner_spec = EP_learner_spec_CATE, cross_validate = TRUE, nfolds = 5)
   print(  Sys.time() - t)
 
   t <- Sys.time()
@@ -197,13 +197,13 @@ onesim <- function(n) {
   sieve_names <- c(colnames(fit_npcausalML$cv_predictions),   names(gam_keep))
 
   CATE_library <- c(CATE_library, list(lrnr_gam_sl))
-  CATEonestepbench <- DR_learner(CATE_library_subst, data.frame(W1=W1), A, Y, EY1W_est, EY0W_est, pA1W_est, NULL, NULL)
+  CATEonestepbench <- DR_learner(CATE_library_subst, as.data.frame(W), A, Y, EY1W_est, EY0W_est, pA1W_est, NULL, NULL)
   CATEonestepbench <- apply(CATEonestepbench, 2, function(pred) {
     mean((pred - CATE)^2)
   })
   names(CATEonestepbench) <- c(unique(tmp$lrnrs) , "Lrnr_gam_cv")
 
-  CATEonestepbenchoracle <- DR_learner(CATE_library, data.frame(W1=W1), A, Y, EY1Wtrue, EY0Wtrue, pA1Wtrue, NULL, NULL)
+  CATEonestepbenchoracle <- DR_learner(CATE_library, as.data.frame(W), A, Y, EY1Wtrue, EY0Wtrue, pA1Wtrue, NULL, NULL)
   CATEonestepbenchoracle <- apply(CATEonestepbenchoracle, 2, function(pred) {
     mean((pred - CATE)^2)
   })
