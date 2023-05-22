@@ -16,8 +16,9 @@ sim.RR <- function(n, hard = TRUE, positivity = TRUE) {
     quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
     LRR <- 0.1*(-1 + W1 + W2 + W3)
-    EY0W <- plogis(-0.8 + -1+W1 + sin(5*W2) + 1/(W3 + 2))
-    EY1W <- EY0W * exp(LRR)
+    EY0W <- plogis(-1 + 0.3*(W1 + W2 + W3 + sin(4*W1) +  sin(4*W2) +  sin(4*W3)))
+    #EY0W <- plogis(-0.8 + -1+W1 + sin(5*W2) + 1/(W3 + 2))
+    EY1W <- pmin(EY0W * exp(LRR),1)
     Y <- rbinom(n, size = 1, EY0W * (1-A) + A* EY1W)
   }
 
@@ -32,8 +33,8 @@ sim.RR <- function(n, hard = TRUE, positivity = TRUE) {
     pA1W <- plogis((W1 + W2 + W3)/3)
     quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
-    LRR <- -0.35  + 0.1*(2*abs(W1) + -1 +W1 - 2*abs(W2)^3 + 1.5*sin(5*W3) - cos( 1 + 5*W2)- 0.5*sin(5*W1+1))
-    EY0W <- plogis(-1.1 + -1+W1 + sin(5*W2) + 1/(W3 + 2))
+    LRR <- 0.1*(-1 + W1 + W2 + W3 + sin(4*W1) +  sin(4*W2) +  sin(4*W3))
+    EY0W <- plogis(-1 + 0.3*(W1 + W2 + W3 + sin(4*W1) +  sin(4*W2) +  sin(4*W3)))
     EY1W <- pmin(EY0W * exp(LRR),1)
     Y <- rbinom(n, size = 1, EY0W * (1-A) + A* EY1W)
 
@@ -48,8 +49,8 @@ sim.RR <- function(n, hard = TRUE, positivity = TRUE) {
     quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
     LRR <- 0.1*(-1 + W1 + W2 + W3)
-    EY0W <- plogis(-1.1 + -1+W1 + sin(5*W2) + 1/(W3 + 2))
-    EY1W <- EY0W * exp(LRR)
+    EY0W <- plogis(-1 + 0.3*(W1 + W2 + W3 + sin(4*W1) +  sin(4*W2) +  sin(4*W3)))
+    EY1W <- pmin(EY0W * exp(LRR),1)
     Y <- rbinom(n, size = 1, EY0W * (1-A) + A* EY1W)
   }
 
@@ -64,8 +65,8 @@ sim.RR <- function(n, hard = TRUE, positivity = TRUE) {
     pA1W <- plogis((W1 + W2 + W3))
     quantile(pA1W)
     A <- rbinom(n, 1 ,  pA1W)
-    LRR <- -0.35  + 0.1*(2*abs(W1) + -1 +W1 - 2*abs(W2)^3 + 1.5*sin(5*W3) - cos( 1 + 5*W2)- 0.5*sin(5*W1+1))
-    EY0W <- plogis(-1.1 + -1+W1 + sin(5*W2) + 1/(W3 + 2))
+    LRR <- 0.1*(-1 + W1 + W2 + W3 + sin(4*W1) +  sin(4*W2) +  sin(4*W3))
+    EY0W <- plogis(-1 + 0.3*(W1 + W2 + W3 + sin(4*W1) +  sin(4*W2) +  sin(4*W3)))
     EY1W <- pmin(EY0W * exp(LRR),1)
     Y <- rbinom(n, size = 1, EY0W * (1-A) + A* EY1W)
 

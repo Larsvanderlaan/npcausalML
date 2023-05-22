@@ -2,17 +2,27 @@ library(ggplot2)
 library(data.table)
 ns <- c(  5000,  500, 1000, 2500)
 ns <- sort(ns)
-hard_list <-  c(T,F)
-pos_list <-  c(T,F)
+hard_list <-  c(F)
+pos_list <-  c(T)
 use_oracle_sieve <- F
 for(pos in pos_list){
   for(hard in hard_list) {
-    try({
+   ({
     sims_list <- lapply(ns, function(n) {
       try({load(paste0("mainSimResults/mainSimResults/simsLRR", hard, pos,  "n", n, "_xgboost"))})
 
 
       simresults <- get(paste0("simresults"))
+
+
+      keep <- sapply(simresults, function(item) {
+        try({
+          force(item$risk_IPW)
+          return(TRUE)
+          })
+        return(FALSE)
+      })
+      simresults <- simresults[keep]
       ipwrisks <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_IPW")))
 
        substrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst")))

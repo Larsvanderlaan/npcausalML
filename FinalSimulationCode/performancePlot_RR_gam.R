@@ -199,7 +199,7 @@ use_oracle_sieve <- F
       names(linetypes) <- labels
       plt <- plt +  scale_colour_manual(  values =   colors)
       plt <- plt + scale_linetype_manual(  values = linetypes)
-      plt <- plt + theme(legend.key.size = unit(1.5, 'cm'), legend.title = element_blank(), legend.direction  = "horizontal") #legend.position = "horizontal")
+      plt <- plt + theme(legend.key.size = unit(1.5, 'cm'), legend.title = element_blank(), legend.direction  = "horizontal" , legend.position = "none")
       ggsave(paste0("mainSimResults/plots/performancePlot_CATE_tree_", "pos=",pos, "hard=",hard, "_", lrnr,".pdf"), width = 10, height = 10)
 
       plt <- plt +
