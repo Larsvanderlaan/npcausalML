@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-ns <- c(  5000, 500, 1000, 2500)
+ns <- c(   500, 1000, 2500)
 ns <- sort(ns)
 hard_list <-   c(T,F)
 pos_list <-  c(T,F)
@@ -9,7 +9,7 @@ for(pos in pos_list){
   for(hard in hard_list) {
     try({
       sims_list <- lapply(ns, function(n) {
-        try({load(paste0("mainSimResults/mainSimResults/simsCATE", hard, pos,  "n", n, "_xgboost_highDim"))
+        try({load(paste0("mainSimResults2/simsCATE", hard, pos,  "n", n, "_xgboost_highDim"))
           simresults <- get(paste0("simresults"))
           simresults <- simresults[sapply(simresults, is.list)]
           onestepbenchoracle <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "CATEonestepbenchoracle")))

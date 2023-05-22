@@ -152,9 +152,9 @@ print("npcausal")
   lrnrs_full <-  colnames(fit_npcausalML$cv_predictions)
   lrnrs <- gsub("[._]sieve_fourier.+", "", lrnrs_full)
   lrnrs <- gsub("_no_sieve", "", lrnrs)
-  degree <- as.numeric(stringr::str_match(lrnrs_full, "fourier_basis_([0-9]+)")[,2])
-  degree[grep("no_sieve", lrnrs_full)] <- 0
-
+  degree <- (stringr::str_match(lrnrs_full, "fourier_basis_([0-9_]+)")[,2])
+  degree[grep("no_sieve", lrnrs_full)] <- "0"
+  uniq_degrees <- sort(unique(degree))
 
 
   tmp <- data.table(lrnrs_full, lrnrs , degree, risk = cvrisksDR, risks_oracle = risks_oracle, cvrisksDR = cvrisksDR, cvrisksDRoracle)
@@ -162,20 +162,20 @@ print("npcausal")
   rf_keep <- tmp[grep("rf", lrnrs_full),risks_oracle[which.min(risk)], by = degree]$V1
   xg_keep <- tmp[grep("xgboost", lrnrs_full),risks_oracle[which.min(risk)], by = degree]$V1
   print(xg_keep)
-  names(xg_keep) <- paste0("Lrnr_xgboost_cv", "_fourier.basis_", 0:4, "_plugin")
-  names(rf_keep) <- paste0("Lrnr_rf_cv", "_fourier.basis_", 0:4, "_plugin")
+  names(xg_keep) <- paste0("Lrnr_xgboost_cv", "_fourier.basis_", uniq_degrees, "_plugin")
+  names(rf_keep) <- paste0("Lrnr_rf_cv", "_fourier.basis_", uniq_degrees, "_plugin")
   risks_oracle <- c(risks_oracle, xg_keep, rf_keep)
 print("here")
   rf_keep <- tmp[grep("rf", lrnrs_full),cvrisksDR[which.min(risk)], by = degree]$V1
   xg_keep <- tmp[grep("xgboost", lrnrs_full),cvrisksDR[which.min(risk)], by = degree]$V1
-  names(xg_keep) <- paste0("Lrnr_xgboost_cv", "_fourier.basis_", 0:4, "_plugin")
-  names(rf_keep) <- paste0("Lrnr_rf_cv", "_fourier.basis_", 0:4, "_plugin")
+  names(xg_keep) <- paste0("Lrnr_xgboost_cv", "_fourier.basis_", uniq_degrees, "_plugin")
+  names(rf_keep) <- paste0("Lrnr_rf_cv", "_fourier.basis_", uniq_degrees, "_plugin")
   cvrisksDR <- c(cvrisksDR, xg_keep, rf_keep)
   print("here")
   rf_keep <- tmp[grep("rf", lrnrs_full),cvrisksDRoracle[which.min(risk)], by = degree]$V1
   xg_keep <- tmp[grep("xgboost", lrnrs_full),cvrisksDRoracle[which.min(risk)], by = degree]$V1
-  names(xg_keep) <- paste0("Lrnr_xgboost_cv", "_fourier.basis_", 0:4, "_plugin")
-  names(rf_keep) <- paste0("Lrnr_rf_cv", "_fourier.basis_", 0:4, "_plugin")
+  names(xg_keep) <- paste0("Lrnr_xgboost_cv", "_fourier.basis_", uniq_degrees, "_plugin")
+  names(rf_keep) <- paste0("Lrnr_rf_cv", "_fourier.basis_", uniq_degrees, "_plugin")
   cvrisksDRoracle <- c(cvrisksDRoracle, xg_keep, rf_keep)
   print("here")
   sieve_names <- c(colnames(fit_npcausalML$cv_predictions),   names(xg_keep),   names(rf_keep))

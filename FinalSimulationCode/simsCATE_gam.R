@@ -174,24 +174,24 @@ onesim <- function(n) {
 
    lrnrs <- gsub("[._]sieve_fourier.+", "", lrnrs_full)
    lrnrs <- gsub("_no_sieve", "", lrnrs)
-
-   degree <- as.numeric(stringr::str_match(lrnrs_full, "fourier_basis_([0-9]+)")[,2])
-  degree[grep("no_sieve", lrnrs_full)] <- 0
+   degree <- (stringr::str_match(lrnrs_full, "fourier_basis_([0-9_]+)")[,2])
+   degree[grep("no_sieve", lrnrs_full)] <- "0"
+   uniq_degrees <- sort(unique(degree))
 
 
 
   tmp <- data.table(lrnrs_full, lrnrs , degree, risk = cvrisksDR, risks_oracle = risks_oracle, cvrisksDR = cvrisksDR, cvrisksDRoracle)
   gam_keep <- tmp[grep("gam", lrnrs_full),risks_oracle[which.min(risk)], by = degree]$V1
-  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", 0:4, "_plugin")
+  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", uniq_degrees, "_plugin")
   risks_oracle <- c(risks_oracle, gam_keep)
 
 
   gam_keep <- tmp[grep("gam", lrnrs_full),cvrisksDR[which.min(risk)], by = degree]$V1
-  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", 0:4, "_plugin")
+  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", uniq_degrees, "_plugin")
   cvrisksDR <- c(cvrisksDR, gam_keep)
 
   gam_keep <- tmp[grep("gam", lrnrs_full),cvrisksDRoracle[which.min(risk)], by = degree]$V1
-  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", 0:4, "_plugin")
+  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", uniq_degrees, "_plugin")
   cvrisksDRoracle <- c(cvrisksDRoracle, gam_keep)
 
   sieve_names <- c(colnames(fit_npcausalML$cv_predictions),   names(gam_keep))
