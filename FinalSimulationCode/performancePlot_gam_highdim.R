@@ -9,7 +9,7 @@ for(pos in pos_list){
   for(hard in hard_list) {
     try({
       sims_list <- lapply(ns, function(n) {
-        try({load(paste0("mainSimResults/mainSimResults/simsCATE", hard, pos,  "n", n, "_gam_highdim"))
+        try({load(paste0("mainSimResults2/mainSimResults2/simsCATE", hard, pos,  "n", n, "_gam_highdim"))
           simresults <- get(paste0("simresults" ))
           simresults <- simresults[sapply(simresults, is.list)]
 

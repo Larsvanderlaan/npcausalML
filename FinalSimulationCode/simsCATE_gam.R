@@ -4,7 +4,7 @@ library(SuperLearner)
 library(npcausalML)
 library(future)
 print(getwd())
-
+nsims<- 1000
 source("./FinalSimulationCode/simCATE.R")
 print("OK")
 SL.gam1 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
@@ -182,16 +182,16 @@ onesim <- function(n) {
 
   tmp <- data.table(lrnrs_full, lrnrs , degree, risk = cvrisksDR, risks_oracle = risks_oracle, cvrisksDR = cvrisksDR, cvrisksDRoracle)
   gam_keep <- tmp[grep("gam", lrnrs_full),risks_oracle[which.min(risk)], by = degree]$V1
-  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", uniq_degrees, "_plugin")
+  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier_basis_", uniq_degrees, "_plugin")
   risks_oracle <- c(risks_oracle, gam_keep)
 
 
   gam_keep <- tmp[grep("gam", lrnrs_full),cvrisksDR[which.min(risk)], by = degree]$V1
-  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", uniq_degrees, "_plugin")
+  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier_basis_", uniq_degrees, "_plugin")
   cvrisksDR <- c(cvrisksDR, gam_keep)
 
   gam_keep <- tmp[grep("gam", lrnrs_full),cvrisksDRoracle[which.min(risk)], by = degree]$V1
-  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier.basis_", uniq_degrees, "_plugin")
+  names(gam_keep) <- paste0("Lrnr_gam_cv", "_fourier_basis_", uniq_degrees, "_plugin")
   cvrisksDRoracle <- c(cvrisksDRoracle, gam_keep)
 
   sieve_names <- c(colnames(fit_npcausalML$cv_predictions),   names(gam_keep))

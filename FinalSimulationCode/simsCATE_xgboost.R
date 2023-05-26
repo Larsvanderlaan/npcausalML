@@ -3,6 +3,7 @@ library(npcausalML)
 library(future)
 library(sl3)
 # plan(cluster, workers = 3)
+nsims<- 1000
 source("./FinalSimulationCode/simCATE.R")
 SL.gam3 <- function(Y, X, newX, family, obsWeights, cts.num = 4,...) {
   deg.gam <- 3
@@ -23,6 +24,8 @@ list_of_sieves_uni   <- list(
   fourier_basis$new(orders = c(3,0)),
   fourier_basis$new(orders = c(1,1))
 )
+
+
 
 lrnr_gam3 <- Lrnr_pkg_SuperLearner$new("SL.gam3" )
 lrnr_gam4 <- Lrnr_pkg_SuperLearner$new("SL.gam4" )

@@ -9,7 +9,7 @@ for(pos in pos_list){
   for(hard in hard_list) {
     try({
     sims_list <- lapply(ns, function(n) {
-      try({load(paste0("mainSimResults2/simsCATE", hard, pos,  "n", n, "_gam"))
+      try({load(paste0("mainSimResults2/mainSimResults2/simsCATE", hard, pos,  "n", n, "_gam"))
       simresults <- get(paste0("simresults" ))
       simresults <- simresults[sapply(simresults, is.list)]
 
@@ -21,9 +21,17 @@ for(pos in pos_list){
 
 
 
+       degree <- (stringr::str_match(simresults[[1]]$sieve$sieve_names, "fourier[_.]basis_([0-9]_[0-9])")[,2])
+       if(any(is.na(degree))){
+       degree[is.na(degree)] <- (stringr::str_match(simresults[[1]]$sieve$sieve_names[is.na(degree)], "fourier[._]basis_([0-9])")[,2])
+}
+     #degree[grep("no_sieve", lrnrs_full)] <- "0"
+      uniq_degrees <- sort(unique(degree))
+
+
       lrnr_names <- names(simresults[[1]]$CATEonestepbench) #simresults[[1]]$sieve[[1]]
       lrnr_names <- unlist(lapply(lrnr_names, function(name) {
-        paste0(name , c( "_no_sieve.plugin", paste0("_fourier_basis_", 1:4, "_plugin")))
+        paste0(name , paste0("_fourier_basis_", uniq_degrees, "_plugin")) #c( "_no_sieve.plugin", paste0("_fourier_basis_", uniq_degrees, "_plugin")))
       }))
       iter <- rep(1:length(simresults), each = length(lrnr_names))
       cvrisksDRoracle <- unlist( lapply(simresults, function(item) {
@@ -33,7 +41,6 @@ for(pos in pos_list){
       cvrisksDR <- unlist(lapply(seq_along(simresults), function(index) {
         item <- simresults[[index]]
         as.vector(item$sieve$cvrisksDR)
-
       }))
 
 
@@ -42,8 +49,11 @@ for(pos in pos_list){
       }))
 
       dt <- data.table(iter, lrnr_full = lrnr_names, cvrisksDR, cvrisksDRoracle, risks_oracle)
-      dt$degree <- as.numeric(stringr::str_match(dt$lrnr_full, "fourier_basis_([0-9]+)")[,2])
-      dt$degree[grep("no_sieve", dt$lrnr_full)] <- 0
+      dt$degree <- (stringr::str_match(dt$lrnr_full, "fourier[._]basis_([0-9]_[0-9])")[,2])
+      if(any(is.na(dt$degree))){
+      dt$degree[is.na(dt$degree)] <- (stringr::str_match(dt$lrnr_full[is.na(dt$degree)], "fourier[._]basis_([0-9])")[,2])
+}
+      #dt$degree[grep("no_sieve", dt$lrnr_full)] <- 0
 
       dt$lrnr[ grep("gam3", dt$lrnr_full)] <- "gam3"
       dt$lrnr[ grep("gam4", dt$lrnr_full)] <- "gam4"
@@ -68,20 +78,20 @@ for(pos in pos_list){
       dt$lrnr <- gsub(".fourier.basis.+", "", dt$lrnr)
 
 
-      dt$type[!is.na(as.numeric(dt$degree))] <- "Sieve-Plugin"
-      dt$type[is.na(as.numeric(dt$degree))] <- dt$degree[is.na(as.numeric(dt$degree))]
+      dt$type  <- "Sieve-Plugin" #[!is.na(as.numeric(dt$degree))]
+      #dt$type[is.na(as.numeric(dt$degree))] <- dt$degree[is.na(as.numeric(dt$degree))]
 
-      dt <- dt[dt$degree > 0]
+      dt <- dt[dt$degree != "0"]
 
-      tmp <- dt[, cv_sieve_risk := risks_oracle[which.min(cvrisksDR)], by = c("lrnr", "iter")]
-      tmp <- tmp[, oracle_sieve_risk := risks_oracle[which.min(risks_oracle)], by = c("lrnr", "iter")]
-      tmp <- tmp[!duplicated(paste0(degree, lrnr, iter )),]
+     # tmp <- dt[, cv_sieve_risk := risks_oracle[which.min(cvrisksDR)], by = c("lrnr", "iter")]
+    #  tmp <- tmp[, oracle_sieve_risk := risks_oracle[which.min(risks_oracle)], by = c("lrnr", "iter")]
+    #  tmp <- tmp[!duplicated(paste0(degree, lrnr, iter )),]
 
 
-       tmp <- dt[, cv_sieve_risk := which.min(cvrisksDR), by = c("lrnr", "iter")]
-       tmp <- tmp[, oracle_sieve_risk := which.min(risks_oracle), by = c("lrnr", "iter")]
-       tmp <- tmp[!duplicated(paste0(degree, lrnr, iter )),]
-
+     #  tmp <- dt[, cv_sieve_risk := which.min(cvrisksDR), by = c("lrnr", "iter")]
+    #   tmp <- tmp[, oracle_sieve_risk := which.min(risks_oracle), by = c("lrnr", "iter")]
+    #   tmp <- tmp[!duplicated(paste0(degree, lrnr, iter )),]
+    # dt <- tmp
 
 
       ###### LATER
@@ -98,7 +108,7 @@ for(pos in pos_list){
        dt <- rbind(dt, tmp, fill = T)
        tmp <- data.table(risks_oracle = substrisks, lrnr_full = names(onestepbench), degree = "Substitution")
        dt <- rbind(dt, tmp, fill = T)
-
+       dt$type[is.na(dt$type)]  <- dt$degree[is.na(dt$type)]
 
       dt$lrnr <- dt$lrnr_full
       dt$lrnr[ grep("gam3", dt$lrnr_full)] <- "gam3"
@@ -124,16 +134,16 @@ for(pos in pos_list){
       dt$lrnr <- gsub("_fourier.basis.+", "", dt$lrnr)
       dt$lrnr <- gsub(".fourier.basis.+", "", dt$lrnr)
 
-      dt$type[!is.na(as.numeric(dt$degree))] <- "Sieve-Plugin"
-      dt$type[is.na(as.numeric(dt$degree))] <- dt$degree[is.na(as.numeric(dt$degree))]
+    #  dt$type[!is.na(as.numeric(dt$degree))] <- "Sieve-Plugin"
+     # dt$type[is.na(as.numeric(dt$degree))] <- dt$degree[is.na(as.numeric(dt$degree))]
 
       print(unique(dt$lrnr_full))
 
       if(!use_oracle_sieve){
-        dt[!is.na(as.numeric(dt$degree)), risks_oracle := risks_oracle[which.min(cvrisksDR)], by = c("lrnr", "type", "iter")]
+        dt[dt$type=="Sieve-Plugin", risks_oracle := risks_oracle[which.min(cvrisksDR)], by = c("lrnr", "type", "iter")]
 
       } else {
-        dt[!is.na(as.numeric(dt$degree)), risks_oracle := min(risks_oracle), by = c("iter", "lrnr", "type")]
+        #dt[!is.na(as.numeric(dt$degree)), risks_oracle := min(risks_oracle), by = c("iter", "lrnr", "type")]
       }
       dt[, risks_best := mean(risks_oracle), by = c("lrnr", "type")]
 

@@ -11,7 +11,7 @@ for(pos in pos_list){
   for(hard in hard_list) {
     try({
     sims_list <- lapply(ns, function(n) {
-      try({load(paste0("mainSimResults2/simsCATE", hard, pos,  "n", n, "_xgboost"))
+      try({load(paste0("mainSimResults2/mainSimResults2/simsCATE", hard, pos,  "n", n, "_xgboost"))
       simresults <- get(paste0("simresults"))
       simresults <- simresults[sapply(simresults, is.list)]
 
@@ -22,11 +22,12 @@ for(pos in pos_list){
       substrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst")))
       cvsubstrisks  <- rowMeans(do.call(cbind, lapply(simresults, `[[`, "risk_subst_cv")))
 
+      uniq_degrees <- c("0_0", "1_0", "2_0", "3_0", "1_1")
 
 
       lrnr_names <- names(simresults[[1]]$CATEonestepbench) #simresults[[1]]$sieve[[1]]
       lrnr_names <- unlist(lapply(lrnr_names, function(name) {
-        paste0(name , c( "_no_sieve.plugin", paste0("_fourier_basis_", 1:4, "_plugin")))
+        paste0(name , c( "_no_sieve.plugin", paste0("_fourier_basis_", uniq_degrees, "_plugin")))
       }))
       iter <- rep(1:length(simresults), each = length(lrnr_names))
       cvrisksDRoracle <- unlist( lapply(simresults, function(item) {
